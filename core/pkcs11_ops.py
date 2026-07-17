@@ -16,7 +16,14 @@ lỗi hay log.
 from __future__ import annotations
 
 import base64
+import threading
 from typing import Any
+
+# Khoá toàn cục: TUẦN TỰ HOÁ mọi thao tác PKCS#11 in-process. Daemon đa luồng +
+# module thường KHÔNG thread-safe -> mỗi lần chỉ một module được nạp/thao tác
+# trong tiến trình. (PyKCS11.load() gọi C_Initialize với CKF_OS_LOCKING_OK ở
+# tầng C; khoá này là lớp phòng vệ thêm cho an toàn tuyệt đối.)
+_PKCS11_LOCK = threading.RLock()
 
 # Cờ CK_TOKEN_INFO (định nghĩa tại chỗ, không cần PyKCS11 để decode).
 CKF_LOGIN_REQUIRED = 0x00000004
@@ -76,26 +83,30 @@ def get_info(module_path: str) -> dict[str, Any]:
         result["error"] = str(exc)
         return result
     lib = pk.PyKCS11Lib()
+    _PKCS11_LOCK.acquire()
     try:
-        lib.load(module_path)
-    except Exception as exc:  # noqa: BLE001
-        result["error"] = f"load thất bại: {exc}"
+        try:
+            lib.load(module_path)
+        except Exception as exc:  # noqa: BLE001
+            result["error"] = f"load thất bại: {exc}"
+            return result
+        try:
+            info = lib.getInfo()
+            cver = getattr(info, "cryptokiVersion", None)
+            if hasattr(cver, "major"):
+                result["cryptoki_version"] = [int(cver.major), int(cver.minor)]
+            elif isinstance(cver, (list, tuple)) and len(cver) >= 2:
+                result["cryptoki_version"] = [int(cver[0]), int(cver[1])]
+            result["manufacturer"] = _clean(getattr(info, "manufacturerID", ""))
+            result["library_description"] = _clean(getattr(info, "libraryDescription", ""))
+            result["ok"] = result["cryptoki_version"] is not None
+        except Exception as exc:  # noqa: BLE001
+            result["error"] = f"C_GetInfo thất bại: {exc}"
+        finally:
+            _finalize(lib)
         return result
-    try:
-        info = lib.getInfo()
-        cver = getattr(info, "cryptokiVersion", None)
-        if hasattr(cver, "major"):
-            result["cryptoki_version"] = [int(cver.major), int(cver.minor)]
-        elif isinstance(cver, (list, tuple)) and len(cver) >= 2:
-            result["cryptoki_version"] = [int(cver[0]), int(cver[1])]
-        result["manufacturer"] = _clean(getattr(info, "manufacturerID", ""))
-        result["library_description"] = _clean(getattr(info, "libraryDescription", ""))
-        result["ok"] = result["cryptoki_version"] is not None
-    except Exception as exc:  # noqa: BLE001
-        result["error"] = f"C_GetInfo thất bại: {exc}"
     finally:
-        _finalize(lib)
-    return result
+        _PKCS11_LOCK.release()
 
 
 # --------------------------------------------------------------------------- #
@@ -105,8 +116,9 @@ def enumerate_tokens(module_path: str) -> list[dict[str, Any]]:
     """Liệt kê token đang cắm. Trả list dict token (JSON-friendly)."""
     pk = _pykcs11()
     lib = pk.PyKCS11Lib()
-    lib.load(module_path)
+    _PKCS11_LOCK.acquire()
     try:
+        lib.load(module_path)  # C_Initialize (CKF_OS_LOCKING_OK ở tầng C)
         tokens: list[dict[str, Any]] = []
         for slot in lib.getSlotList(tokenPresent=True):
             ti = lib.getTokenInfo(slot)
@@ -123,6 +135,7 @@ def enumerate_tokens(module_path: str) -> list[dict[str, Any]]:
         return tokens
     finally:
         _finalize(lib)
+        _PKCS11_LOCK.release()
 
 
 # --------------------------------------------------------------------------- #
@@ -135,9 +148,10 @@ def read_certs(module_path: str, slot_id: int, pin: str | None = None) -> list[d
     """
     pk = _pykcs11()
     lib = pk.PyKCS11Lib()
-    lib.load(module_path)
     session = None
+    _PKCS11_LOCK.acquire()
     try:
+        lib.load(module_path)
         session = lib.openSession(slot_id)
         if pin:
             session.login(pin)  # PIN chỉ ở đây, không đi đâu khác
@@ -157,6 +171,7 @@ def read_certs(module_path: str, slot_id: int, pin: str | None = None) -> list[d
     finally:
         _safe_logout(session)
         _finalize(lib)
+        _PKCS11_LOCK.release()
 
 
 # --------------------------------------------------------------------------- #
@@ -178,9 +193,10 @@ def sign(
     ckm = getattr(pk, f"CKM_{mech_name}")
 
     lib = pk.PyKCS11Lib()
-    lib.load(module_path)
     session = None
+    _PKCS11_LOCK.acquire()
     try:
+        lib.load(module_path)
         session = lib.openSession(slot_id)
         if pin:
             session.login(pin)
@@ -197,6 +213,7 @@ def sign(
     finally:
         _safe_logout(session)
         _finalize(lib)
+        _PKCS11_LOCK.release()
 
 
 # --------------------------------------------------------------------------- #

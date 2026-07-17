@@ -115,16 +115,27 @@ class TokenInfo(_Base):
     KHÔNG suy từ tên module (TRỤC 1) và KHÔNG dính tới CA (TRỤC 3).
     """
 
-    module: str = Field(default="", description="Module PKCS#11 đã dùng để thấy token.")
+    module_path: str = Field(default="", description="Module PKCS#11 đã dùng để thấy token.")
     slot_id: int = Field(..., description="Định danh slot PKCS#11.")
     label: str = ""
+    # ⭐ TRỤC 2 — CHIP THẬT: đọc từ C_GetTokenInfo, ĐỘC LẬP với tên module.
     manufacturer_id: str = Field(
         default="", description="Chip THẬT (CK_TOKEN_INFO.manufacturerID)."
     )
-    model: str = ""
+    model: str = Field(default="", description="Model chip THẬT (CK_TOKEN_INFO.model).")
     serial: str = ""
     flags: int = Field(default=0, description="Bitmask CK_TOKEN_INFO.flags thô.")
     pin_state: PinState = Field(default_factory=PinState)
+    # -- Metadata TRỤC 1 (từ ModuleCandidate) — GỢI Ý, khác chip thật ở trên -- #
+    track: str = Field(default="", description="Nhánh module: A (chip) | B (CA rebrand).")
+    chip_hint: str = Field(
+        default="", description="Gợi ý từ tên module (KHÔNG phải chip thật)."
+    )
+    source: str = Field(default="", description="Nguồn phát hiện module.")
+    arch: str = Field(default="unknown", description="Kiến trúc native của module.")
+    via_bridge: bool = Field(
+        default=False, description="Token được liệt kê QUA bridge (module lệch arch)."
+    )
 
 
 class KeyInfo(_Base):

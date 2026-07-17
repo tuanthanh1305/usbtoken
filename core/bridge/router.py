@@ -125,7 +125,7 @@ class ModuleSession:
     def _to_token(self, d: dict[str, Any]) -> TokenInfo:
         ps = d.get("pin_state") or {}
         return TokenInfo(
-            module=str(self.path),
+            module_path=str(self.path),
             slot_id=int(d.get("slot_id", -1)),
             label=str(d.get("label", "")),
             manufacturer_id=str(d.get("manufacturer_id", "")),
