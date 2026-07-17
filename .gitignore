@@ -1,0 +1,36 @@
+# --- Python ---
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+venv/
+.env
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+*.tsbuildinfo
+
+# --- PyInstaller ---
+*.spec
+*.manifest
+
+# --- Node / Vite (web) ---
+web/node_modules/
+web/dist/
+web/.vite/
+
+# --- Dữ liệu neo tin cậy tải về (KHÔNG commit chứng thư tải tự động;
+#     chỉ commit chứng thư đã xác minh thủ công + kèm nguồn) ---
+data/trust_store/*.der
+data/trust_store/*.pem
+data/trust_store/*.crt
+data/trust_store/_downloaded/
+
+# --- OS / editor ---
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/

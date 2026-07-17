@@ -1,0 +1,61 @@
+# vendor_intel.yaml — BẢNG THÔNG TIN NHÀ CUNG CẤP MODULE PKCS#11 (TRỤC 1).
+#
+# Đây là DỮ LIỆU (biến động được), KHÔNG phải logic. Bổ sung nhà cung cấp mới =
+# thêm một mục, không sửa code.
+#
+# HAI NHÁNH:
+#   track_a — theo CHIP: tên file middleware của nhà sản xuất chip.
+#   track_b — CA REBRAND: module do một CA phát hành riêng (không mang tên chip).
+#
+# ⚠️ chip_hint/ca_hint chỉ là GỢI Ý từ tên file — KHÔNG có giá trị pháp lý.
+#    - Chip THẬT: đọc qua C_GetTokenInfo().manufacturerID (TRỤC 2).
+#    - CA THẬT:   xác định bằng chain building (TRỤC 3, core/trust).
+
+track_a:
+  - vendor: "SafeNet/Thales"
+    windows: ["eTPKCS11.dll"]
+    macos: ["libeTPkcs11.dylib"]
+    linux: ["libeToken.so", "libeTPkcs11.so"]
+
+  - vendor: "Feitian ePass2003"
+    windows: ["eps2003csp11.dll", "ShuttleCsp11_3003.dll", "ngp11v211.dll"]
+    macos: ["libShuttleCsp11_3003.dylib", "libcastle.dylib"]
+    linux: ["libcastle.so", "libeps2003csp11.so"]
+
+  - vendor: "Watchdata"
+    windows: ["WDPKCS.dll"]
+    macos: ["libwdpkcs.dylib"]
+    linux: ["libwdpkcs.so"]
+    extra_dirs:
+      macos: ["/usr/local/lib/watchdata/lib"]
+
+  - vendor: "SafeSign"
+    windows: ["aetpkss1.dll"]
+    macos: ["libaetpkss.dylib"]
+    linux: ["libaetpkss.so"]
+
+  - vendor: "Gemalto"
+    windows: ["gclib.dll"]
+    macos: ["libgclib.dylib"]
+    linux: ["libgclib.so"]
+
+  - vendor: "OpenSC"
+    windows: ["opensc-pkcs11.dll"]
+    # LƯU Ý: OpenSC trên macOS vẫn dùng đuôi .so (không phải .dylib).
+    macos: ["opensc-pkcs11.so"]
+    linux: ["opensc-pkcs11.so"]
+
+  - vendor: "p11-kit proxy"
+    macos: ["p11-kit-proxy.dylib"]
+    linux: ["p11-kit-proxy.so"]
+
+track_b:
+  # FPT-CA phát hành module PKCS#11 RIÊNG, không mang tên chip.
+  # ĐÃ XÁC NHẬN: gói dpkg "fptca-4.0" cài /usr/lib/fptca_v4.so trên Linux.
+  # Hệ thống chỉ quét Track A sẽ KHÔNG BAO GIỜ dò ra FPT-CA trên Linux.
+  - ca_hint: "FPT-CA"
+    note: "gói dpkg fptca-4.0 — ĐÃ XÁC NHẬN"
+    linux: ["fptca_v4.so"]
+    linux_paths: ["/usr/lib/fptca_v4.so"]
+    windows: []
+    macos: []

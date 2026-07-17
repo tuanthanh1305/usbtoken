@@ -1,0 +1,86 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "vn-esign-suite"
+version = "0.1.0"
+description = "Phần mềm ký số & kiểm tra chữ ký số trên USB token cho Việt Nam — Windows/macOS/Linux ngang hàng, tuân thủ NĐ 23/2025 & TT 15/2025."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "Proprietary" }
+authors = [{ name = "vn-esign-suite" }]
+keywords = ["pkcs11", "digital-signature", "vietnam", "pki", "neac", "esign", "x509"]
+classifiers = [
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Operating System :: Microsoft :: Windows",
+    "Operating System :: MacOS :: MacOS X",
+    "Operating System :: POSIX :: Linux",
+    "Topic :: Security :: Cryptography",
+]
+
+# Phụ thuộc lõi — pin chính xác (khớp requirements.txt).
+dependencies = [
+    "PyKCS11==1.5.17",
+    "pyscard==2.2.1",
+    "cryptography==44.0.0",
+    "asn1crypto==1.5.1",
+    "PyYAML==6.0.2",
+    "fastapi==0.115.6",
+    "uvicorn[standard]==0.34.0",
+    "httpx==0.28.1",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest==8.3.4",
+    "ruff==0.9.2",
+    "mypy==1.14.1",
+    "types-PyYAML==6.0.12.20240917",
+]
+packaging = ["pyinstaller==6.11.1"]
+
+[project.scripts]
+vn-esign-service = "service.main:main"
+vn-esign-diagnose = "tools.diagnose:main"
+
+[tool.setuptools]
+packages = [
+    "core",
+    "core.platform",
+    "core.bridge",
+    "core.trust",
+    "core.esign",
+    "service",
+    "service.api",
+    "tools",
+]
+
+[tool.setuptools.package-data]
+# Đóng gói kèm dữ liệu neo tin cậy & bảng phụ lục (nếu đã điền).
+"*" = ["data/**/*.yaml", "data/trust_store/**/*"]
+
+# --------------------------------------------------------------------------- #
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+src = ["core", "service", "tools", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
+ignore = ["E501"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["core", "service", "tools"]
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+warn_unused_ignores = false
+ignore_missing_imports = true
+files = ["core", "service", "tools"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"

@@ -1,0 +1,18 @@
+# vn-esign-suite — phụ thuộc lõi (pin chính xác để build tái lập trên cả 3 OS).
+# Cài dev kèm: pip install -r requirements.txt -r requirements-dev.txt
+
+# --- Tầng PKCS#11 & thẻ thông minh ---
+PyKCS11==1.5.17          # binding PKCS#11 (nạp module .dll/.dylib/.so của token)
+pyscard==2.2.1           # PC/SC (giao tiếp reader / thẻ thông minh)
+
+# --- Mật mã & X.509 (TRỌNG TÂM PHÁP LÝ: chain building, CRL, ký/kiểm tra) ---
+cryptography==44.0.0     # X.509, chữ ký, băm, CRL, verify_directly_issued_by
+asn1crypto==1.5.1        # bóc tách ASN.1/DER cấp thấp khi cần
+
+# --- Cấu hình & dữ liệu ---
+PyYAML==6.0.2            # đọc vendor_intel.yaml, appendix_I/II.yaml, trust config
+
+# --- Service daemon & kết nối Cổng eSign ---
+fastapi==0.115.6         # daemon REST localhost
+uvicorn[standard]==0.34.0  # ASGI server
+httpx==0.28.1            # HTTP client (Cổng eSign, tải CRL/OCSP)

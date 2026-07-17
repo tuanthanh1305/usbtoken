@@ -1,0 +1,27 @@
+# ============================================================================
+# Phụ lục I — TIÊU CHUẨN KỸ THUẬT (Thông tư 15/2025/TT-BKHCN)
+# ============================================================================
+# ⚠️ CHƯA ĐIỀN. Đây là KHUNG RỖNG.
+#
+# BẮT BUỘC: TRANSCRIBE trực tiếp từ bản gốc — KHÔNG suy đoán thuật toán, độ dài
+# khoá hay định dạng:
+#   https://rootca.gov.vn/VanBan/Thongtu_So15_2025_TT_BKHCN.pdf
+#
+# Khi đã điền và rà soát đối chiếu bản gốc, đổi:  status: filled
+# Trước khi đó, core/trust/policy.py sẽ TỪ CHỐI mọi kiểm tra "chặt" theo Phụ lục
+# (fail-safe) — cố ý, để không tạo ra kết luận sai về pháp lý.
+# ----------------------------------------------------------------------------
+
+status: not_filled          # not_filled | filled | verified
+source_url: "https://rootca.gov.vn/VanBan/Thongtu_So15_2025_TT_BKHCN.pdf"
+transcribed_by: ""
+transcribed_at: ""
+
+# --- CHỜ ĐIỀN TỪ BẢN GỐC (ví dụ cấu trúc, giá trị PHẢI lấy từ PDF) ---------
+signature_algorithms: []    # ví dụ khung: ["RSASSA-PKCS1-v1_5-SHA256", ...]
+hash_algorithms: []
+min_key_sizes: {}           # ví dụ khung: { RSA: 0, EC: 0 }  (điền số thật từ PDF)
+timestamp:
+  required_when: ""         # điều kiện luật yêu cầu gắn dấu thời gian
+  tsa_profile: ""
+signature_formats: []       # ví dụ: CAdES / PAdES / XAdES — theo đúng Phụ lục I

@@ -1,0 +1,18 @@
+# systemd user unit cho daemon vn-esign (Linux).
+#   mkdir -p ~/.config/systemd/user
+#   cp packaging/linux/vn-esign.service ~/.config/systemd/user/
+#   systemctl --user daemon-reload && systemctl --user enable --now vn-esign.service
+# Yêu cầu: pcscd đang chạy (gói pcsc-lite).
+
+[Unit]
+Description=vn-esign-suite — daemon ký số & kiểm tra chữ ký số (localhost)
+After=pcscd.service
+
+[Service]
+Type=simple
+ExecStart=%h/.local/bin/vn-esign-service
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=default.target
