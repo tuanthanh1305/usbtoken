@@ -58,12 +58,14 @@ def main(argv: list[str] | None = None) -> int:
     _list_store()
 
     if args.check_gateway:
-        from core.esign import ESignGatewayClient
         from core.errors import ESignGatewayError
+        from core.esign import make_gateway
 
         try:
-            ok = ESignGatewayClient().health()
-            print(f"\nCổng eSign: {'kết nối được' if ok else 'không phản hồi'}")
+            status = make_gateway().health()
+            print(f"\nCổng eSign: {'kết nối được' if status.reachable else 'không phản hồi'}")
+            if status.detail:
+                print(f"  {status.detail}")
         except ESignGatewayError as exc:
             print(f"\nCổng eSign: {exc.message}")
             if exc.detail:

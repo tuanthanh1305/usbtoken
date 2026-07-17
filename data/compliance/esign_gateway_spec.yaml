@@ -1,0 +1,58 @@
+# ============================================================================
+# SPEC KẾT NỐI CỔNG eSIGN (Cổng kết nối dịch vụ chứng thực chữ ký số công cộng)
+# Căn cứ: Điều 44 NĐ 23/2025/NĐ-CP; Điều 7 & Điều 8 TT 15/2025/TT-BKHCN.
+# ============================================================================
+# ⛔ CHƯA HIỆN THỰC — CHỜ HƯỚNG DẪN KỸ THUẬT CỦA BỘ KH&CN.
+#
+# Điều 8 TT 15/2025 quy định phần mềm ký số phải tuân thủ "Hướng dẫn kỹ thuật về
+# kết nối" do Bộ KH&CN ban hành. Văn bản đó quy định: giao thức, endpoint, định
+# dạng bản tin, cơ chế xác thực. KHÔNG CÓ NÓ THÌ KHÔNG THỂ VIẾT ĐÚNG — và viết
+# theo phỏng đoán là RỦI RO KHÔNG CHẤP NHẬN ĐƯỢC trong dự án cấp quốc gia.
+#
+# ▸ Lấy bản chính thức: NEAC — Trung tâm Chứng thực điện tử quốc gia, Bộ KH&CN,
+#   115 Trần Duy Hưng, Hà Nội (rootca.gov.vn).
+# ▸ Điền các trường dưới đây ĐÚNG theo văn bản rồi đổi:  status: filled
+# ▸ Khi status != filled, core/esign/gateway.py TỪ CHỐI mọi thao tác mạng
+#   (fail-closed) và KHÔNG được tuyên bố tuân thủ Điều 7/8.
+# ----------------------------------------------------------------------------
+
+status: not_filled            # not_filled | filled | verified
+source_document: ""           # tên/số hiệu Hướng dẫn kỹ thuật của Bộ KH&CN
+transcribed_by: ""
+transcribed_at: ""
+
+# --- CHỜ ĐIỀN TỪ HƯỚNG DẪN KỸ THUẬT (giá trị PHẢI lấy từ văn bản) -----------
+base_url: ""                  # gốc endpoint Cổng eSign (HTTPS)
+message_format: ""            # định dạng bản tin: json | xml | soap (theo văn bản)
+
+auth:
+  mechanism: ""               # mtls | api_key | oauth2 ... (theo văn bản)
+  # Bí mật (khoá/API key/chứng thư client) KHÔNG để ở đây — nạp từ nguồn an toàn
+  # của người vận hành lúc chạy; file này chỉ mô tả CƠ CHẾ.
+
+tls:
+  verify: true                # BẮT BUỘC verify TLS — KHÔNG cho phép tắt.
+  min_version: ""             # vd. "1.2" / "1.3" theo văn bản
+
+# Chỉ được ra mạng tới các domain trong allowlist (chống lộ/nhầm đích).
+allowed_domains: []           # vd: ["esign.neac.gov.vn"]
+
+timeouts:
+  connect_seconds: 10
+  read_seconds: 30
+
+retry:
+  max_attempts: 3
+  backoff_base_seconds: 0.5
+  backoff_max_seconds: 8.0
+
+circuit_breaker:
+  failure_threshold: 5
+  reset_timeout_seconds: 30
+
+# Ánh xạ thao tác -> endpoint (điền path + method theo văn bản). Để rỗng khi chưa có.
+operations:
+  register:         { path: "", method: "" }
+  submit_signature: { path: "", method: "" }
+  query_status:     { path: "", method: "" }
+  health:           { path: "", method: "" }

@@ -85,6 +85,11 @@ def appendix_ii_path() -> Path:
     return compliance_dir() / "appendix_II.yaml"
 
 
+def esign_gateway_spec_path() -> Path:
+    """Đường dẫn spec kết nối Cổng eSign — PHẢI điền từ Hướng dẫn kỹ thuật Bộ KH&CN."""
+    return compliance_dir() / "esign_gateway_spec.yaml"
+
+
 def _load_yaml(path: Path) -> dict[str, Any]:
     """Nạp một file YAML thành dict (rỗng nếu thiếu/không hợp lệ)."""
     try:
@@ -162,6 +167,7 @@ __all__ = [
     "atr_table_path",
     "appendix_i_path",
     "appendix_ii_path",
+    "esign_gateway_spec_path",
     "load_ca_registry",
     "ca_registry_names",
     "ca_discovery_keywords",
