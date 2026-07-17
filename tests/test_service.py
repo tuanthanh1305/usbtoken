@@ -11,7 +11,8 @@ from tests.certs import make_chain
 
 
 def _client() -> TestClient:
-    return TestClient(create_app())
+    # Daemon chỉ phục vụ loopback -> đặt base_url 127.0.0.1 để qua kiểm Host header.
+    return TestClient(create_app(), base_url="http://127.0.0.1:8787")
 
 
 def test_health() -> None:
