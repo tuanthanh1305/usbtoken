@@ -49,6 +49,7 @@ def test_validate_untrusted_with_empty_store() -> None:
     )
     assert r.status_code == 200
     body = r.json()
-    # Kho tin cậy mặc định rỗng -> UNTRUSTED, kèm lý do tiếng Việt.
-    assert body["status"] == "untrusted"
+    # Kho tin cậy mặc định rỗng -> KHÔNG dựng được đường dẫn tin cậy -> INVALID
+    # (fail-closed), kèm lý do tiếng Việt.
+    assert body["status"] == "invalid"
     assert body["reasons_vi"]

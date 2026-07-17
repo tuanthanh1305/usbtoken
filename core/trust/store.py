@@ -181,6 +181,20 @@ class TrustStore:
             dn_fallback = dn_fallback or entry
         return dn_fallback
 
+    def is_trust_anchor(self, cert: x509.Certificate) -> bool:
+        """``cert`` có phải NEO GỐC trong kho không.
+
+        Neo gốc = chứng thư gốc NEAC (``role="root"``) hoặc neo nội bộ do người
+        vận hành ghim (``role="internal"``). So khớp bằng vân tay SHA-256 (mật mã),
+        KHÔNG so chuỗi tên. Danh sách nước ngoài (``role="foreign"``) KHÔNG phải
+        neo gốc NEAC — xử lý riêng ở tầng validator.
+        """
+        fp = cert.fingerprint(hashes.SHA256())
+        for entry in self.entries:
+            if entry.role in ("root", "internal") and entry.cert.fingerprint(hashes.SHA256()) == fp:
+                return True
+        return False
+
     @staticmethod
     def get_ca_display_name(ca_cert: x509.Certificate) -> str:
         """Tên CA lấy TỪ CHÍNH chứng thư CA đã xác thực (không đoán)."""

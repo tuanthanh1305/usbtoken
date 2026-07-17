@@ -240,46 +240,62 @@ class RevocationStatus(str, Enum):
 
 
 class ValidationStatusCode(str, Enum):
-    """Kết luận tổng thể của việc kiểm tra hiệu lực chứng thư."""
+    """Kết luận tổng thể (theo Điều 6 TT 15/2025)."""
 
     VALID = "valid"
-    INVALID = "invalid"
+    INVALID = "invalid"  # chain đứt / chữ ký sai / ràng buộc CA sai / chưa hiệu lực
     EXPIRED = "expired"
-    NOT_YET_VALID = "not_yet_valid"
     REVOKED = "revoked"
-    UNTRUSTED = "untrusted"  # không dựng được đường dẫn tới neo tin cậy
-    POLICY_NOT_CONFIGURED = "policy_not_configured"  # chưa điền Phụ lục I/II
-    ERROR = "error"
+    UNKNOWN = "unknown"  # KHÔNG xác định được (thu hồi không lấy được / chưa đủ căn cứ) — FAIL-CLOSED
+    FOREIGN_RECOGNIZED = "foreign_recognized"  # thuộc DS tin cậy nước ngoài (TT 06/2024)
 
 
 class TrustPathNode(_Base):
-    """Một mắt xích trong đường dẫn tin cậy (để lưu làm bằng chứng)."""
+    """Một mắt xích đường dẫn tin cậy (bằng chứng)."""
 
     subject: str
     issuer: str
     serial_hex: str
     is_trust_anchor: bool = False
     fingerprint_sha256: str = ""
+    ca_name: str = Field(default="", description="Tên CA lấy TỪ CHÍNH chứng thư (CN/O), KHÔNG regex.")
+
+
+class RevocationEvidence(_Base):
+    """Bằng chứng kiểm tra thu hồi tại MỘT bậc trong chain."""
+
+    node_subject: str = ""
+    status: RevocationStatus = RevocationStatus.UNCHECKED
+    method: str = Field(default="", description="OCSP | CRL | NONE.")
+    source_url: str = ""
+    checked_at: datetime | None = None
+    this_update: datetime | None = None
+    next_update: datetime | None = None
+    crl_snapshot_sha256: str = ""
+    reasons_vi: list[str] = Field(default_factory=list)
 
 
 class ValidationResult(_Base):
-    """Kết quả kiểm tra hiệu lực — PHẢI LƯU ĐƯỢC (bằng chứng pháp lý).
+    """Kết quả kiểm tra hiệu lực — BẰNG CHỨNG PHÁP LÝ (lưu được).
 
-    Theo Điều 5/6 TT 15/2025: lưu chứng thư đã ký + CRL tại thời điểm ký + kết
-    quả kiểm tra trạng thái, và kiểm qua ĐƯỜNG DẪN TIN CẬY tới chứng thư gốc.
+    Theo Điều 6 TT 15/2025: kiểm qua ĐƯỜNG DẪN TIN CẬY tới chứng thư gốc NEAC +
+    kiểm thu hồi ở mọi bậc + đáp ứng Phụ lục II. FAIL-CLOSED tuyệt đối.
     """
 
     status: ValidationStatusCode
-    checked_at: datetime = Field(..., description="Thời điểm kiểm tra (UTC).")
+    checked_at: datetime = Field(..., description="Thời điểm thực hiện kiểm tra (UTC).")
+    at_time: datetime = Field(..., description="Mốc thời gian đối chiếu hiệu lực (now hoặc thời điểm ký).")
     subject: str = ""
+    ca_name: str = Field(default="", description="CA phát hành trực tiếp (từ chain, không regex).")
     trust_path: list[TrustPathNode] = Field(default_factory=list)
-    revocation_status: RevocationStatus = RevocationStatus.UNCHECKED
-    crl_snapshot_ref: str = Field(
-        default="", description="Tham chiếu ảnh chụp CRL tại thời điểm kiểm (đường dẫn/hash)."
+    revocations: list[RevocationEvidence] = Field(
+        default_factory=list, description="Bằng chứng thu hồi ở MỌI bậc."
     )
-    ocsp_snapshot_ref: str = ""
+    trust_store_synced_at: datetime | None = Field(
+        default=None, description="Thời điểm đồng bộ kho neo tin cậy (đánh giá độ mới)."
+    )
     reasons_vi: list[str] = Field(
-        default_factory=list, description="Lý do/diễn giải BẰNG TIẾNG VIỆT."
+        default_factory=list, description="Lý do/diễn giải BẰNG TIẾNG VIỆT cho người dùng cuối."
     )
 
 
@@ -296,6 +312,7 @@ class ErrorCode(str, Enum):
     BRIDGE_UNAVAILABLE = "bridge_unavailable"
     TOKEN_NOT_PRESENT = "token_not_present"
     LOGIN_REQUIRED = "login_required"
+    VALIDATION_FAILED = "validation_failed"
     TRUST_STORE_EMPTY = "trust_store_empty"
     CHAIN_BUILD_FAILED = "chain_build_failed"
     POLICY_NOT_CONFIGURED = "policy_not_configured"
@@ -326,6 +343,7 @@ __all__ = [
     "RevocationStatus",
     "ValidationStatusCode",
     "TrustPathNode",
+    "RevocationEvidence",
     "ValidationResult",
     "ErrorCode",
     "ErrorInfo",

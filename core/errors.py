@@ -48,6 +48,19 @@ class ChainBuildError(VNeSignError):
     code = ErrorCode.CHAIN_BUILD_FAILED
 
 
+class SigningNotAllowedError(VNeSignError):
+    """Chứng thư KHÔNG hợp lệ -> KHÔNG được phép ký (Điều 5 TT 15/2025).
+
+    Mang theo :class:`ValidationResult` để tầng trên hiển thị lý do tiếng Việt.
+    """
+
+    code = ErrorCode.VALIDATION_FAILED
+
+    def __init__(self, message: str, *, detail: str = "", result: object = None) -> None:
+        super().__init__(message, detail=detail)
+        self.result = result
+
+
 class PolicyNotConfiguredError(VNeSignError):
     """Chưa điền Phụ lục I/II của TT 15/2025 -> không được phép kiểm tra/ký."""
 
@@ -67,6 +80,7 @@ __all__ = [
     "BridgeUnavailableError",
     "TrustStoreEmptyError",
     "ChainBuildError",
+    "SigningNotAllowedError",
     "PolicyNotConfiguredError",
     "ESignGatewayError",
 ]

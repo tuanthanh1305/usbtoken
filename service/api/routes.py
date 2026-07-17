@@ -16,7 +16,7 @@ from core import __version__
 from core.engine import get_platform_info, list_modules, trust_store_summary
 from core.models import ModuleCandidate, PlatformInfo, ValidationResult
 from core.trust.policy import CompliancePolicy
-from core.trust.validator import CertificateValidator
+from core.trust.validator import CertificateValidator, ValidatorConfig
 
 router = APIRouter(prefix="/api", tags=["vn-esign"])
 
@@ -64,7 +64,8 @@ def validate(req: ValidateRequest) -> ValidationResult:
     tin cậy rỗng, kết quả phản ánh đúng trạng thái fail-safe.
     """
     der = base64.b64decode(req.certificate_b64)
-    return CertificateValidator().validate(der, allow_network=req.allow_network)
+    config = ValidatorConfig(allow_network=req.allow_network)
+    return CertificateValidator(config=config).validate(der)
 
 
 __all__ = ["router"]

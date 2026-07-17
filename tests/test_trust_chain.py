@@ -1,17 +1,15 @@
-"""Test TRỌNG TÂM PHÁP LÝ: chain building (nhận diện CA bằng mật mã, KHÔNG regex)
-và kết quả kiểm tra hiệu lực (fail-safe theo Phụ lục & kho tin cậy)."""
+"""Test TRỌNG TÂM PHÁP LÝ: chain building (nhận diện CA bằng mật mã, KHÔNG regex).
+
+Kiểm tra hiệu lực đầy đủ (VALID/EXPIRED/REVOKED/UNKNOWN/FOREIGN...) nằm ở
+``tests/test_validator.py``.
+"""
 
 from __future__ import annotations
 
 from pathlib import Path
 
-import pytest
-
-from core.models import ValidationStatusCode
 from core.trust.anchors import TrustAnchorStore
 from core.trust.chain import ChainBuilder
-from core.trust.policy import CompliancePolicy
-from core.trust.validator import CertificateValidator
 from tests.certs import make_chain
 
 
@@ -48,39 +46,3 @@ def test_chain_empty_store(tmp_path: Path) -> None:
     result = ChainBuilder(store).build(leaf.cert)
     assert result.verified is False
     assert any("rỗng" in r.lower() for r in result.reasons_vi)
-
-
-def test_validator_untrusted_when_store_empty(tmp_path: Path) -> None:
-    _, _, leaf = make_chain()
-    validator = CertificateValidator(
-        store=TrustAnchorStore(store_dir=tmp_path), policy=CompliancePolicy()
-    )
-    res = validator.validate(leaf.der)
-    assert res.status is ValidationStatusCode.UNTRUSTED
-    assert res.reasons_vi  # có diễn giải tiếng Việt
-
-
-def test_validator_policy_not_configured_even_if_chain_ok(tmp_path: Path) -> None:
-    # Chuỗi hợp lệ nhưng Phụ lục I/II CHƯA điền -> KHÔNG được tuyên VALID.
-    root, inter, leaf = make_chain()
-    store = _store_with(tmp_path, root, inter)
-    res = CertificateValidator(store=store, policy=CompliancePolicy()).validate(leaf.der)
-    assert res.status is ValidationStatusCode.POLICY_NOT_CONFIGURED
-    assert len(res.trust_path) == 3  # vẫn lưu đường dẫn tin cậy làm bằng chứng
-
-
-def test_validator_expired_cert(tmp_path: Path) -> None:
-    from datetime import datetime, timedelta, timezone
-
-    from tests.certs import _make
-
-    root = _make("VN Test Root CA", None, is_ca=True)
-    inter = _make("VN Test Public CA", root, is_ca=True)
-    past = datetime.now(timezone.utc) - timedelta(days=10)
-    leaf = _make(
-        "Nguyen Van B", inter, is_ca=False,
-        not_before=past - timedelta(days=5), not_after=past,
-    )
-    store = _store_with(tmp_path, root, inter)
-    res = CertificateValidator(store=store, policy=CompliancePolicy()).validate(leaf.der)
-    assert res.status is ValidationStatusCode.EXPIRED
