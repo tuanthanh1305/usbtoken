@@ -18,4 +18,7 @@ from .anchors import TrustAnchorStore
 from .chain import ChainBuilder
 from .validator import CertificateValidator
 
+# Lưu ý: KHÔNG import ``.store`` ở đây để tránh RuntimeWarning khi chạy trực tiếp
+# ``python -m core.trust.store``. Dùng: ``from core.trust.store import load``.
+
 __all__ = ["TrustAnchorStore", "ChainBuilder", "CertificateValidator"]

@@ -17,7 +17,7 @@ ký số (Điều 17 NĐ 23/2025/NĐ-CP và Điều 5, Điều 6 TT 15/2025/TT-B
 | 1 | Kiểm tra thông tin chủ thể ký + hiệu lực chứng thư **TRƯỚC KHI** ký | `core/trust/validator.py` (`CertificateValidator.validate`) | Khung xong; logic ký chờ giai đoạn sau | *cần xác nhận* |
 | 2 | Khóa bí mật lưu trong thiết bị chuyên dụng (USB token) | `core/platform/*` + `core/bridge/*` (nạp PKCS#11) | Khung nạp module xong; đọc token giai đoạn sau | *cần xác nhận* |
 | 3 | Gắn chữ ký + chứng thư + thời gian ký vào thông điệp ngay sau khi ký | (giai đoạn ký — chờ Phụ lục I: định dạng CAdES/PAdES/XAdES) | Chưa hiện thực (chặn bởi Phụ lục I) | *cần xác nhận* |
-| 4 | Cài đặt/tích hợp/cập nhật chứng thư NEAC + CA công cộng + DS nước ngoài | `core/trust/anchors.py`, `core/esign/gateway.py`, `data/trust_store/` | Kho + nạp xong; cập nhật qua Cổng eSign chờ spec | *cần xác nhận* |
+| 4 | Cài đặt/tích hợp/cập nhật chứng thư NEAC + CA công cộng + DS nước ngoài | `core/trust/store.py`, `tools/sync_trust_store.py`, `core/trust/signing.py`, `data/trust_store/` | **Hiện thực** (sync từ rootca.gov.vn có provenance + ký kho + fail-closed); URL nguồn điền vào `sources.yaml` | *cần xác nhận* |
 | 5 | Gắn dấu thời gian khi pháp luật yêu cầu | `core/esign/gateway.py` (`request_timestamp`) | Khung; thuật toán băm + TSA chờ Phụ lục I | *cần xác nhận* |
 | 6 | Kiểm tra hiệu lực qua **ĐƯỜNG DẪN TIN CẬY** tới chứng thư gốc NEAC | `core/trust/chain.py` (`ChainBuilder`) | **Hiện thực** (chain building mật mã) | *cần xác nhận* |
 | 7 | Kết nối Cổng eSign công cộng | `core/esign/gateway.py` | Khung client; endpoint chờ tài liệu tích hợp NEAC | *cần xác nhận* |

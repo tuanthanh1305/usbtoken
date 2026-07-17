@@ -26,6 +26,45 @@ def trust_store_dir() -> Path:
     return data_dir() / "trust_store"
 
 
+def current_trust_store_dir() -> Path:
+    """Kho neo tin cậy ĐANG DÙNG (đã được áp dụng & ký)."""
+    return trust_store_dir() / "current"
+
+
+def trust_store_staging_dir() -> Path:
+    """Nơi công cụ sync ghi tạm trước khi người vận hành xác nhận áp dụng."""
+    return trust_store_dir() / "_staging"
+
+
+def trust_store_internal_dir() -> Path:
+    """Neo tin cậy nội bộ do người vận hành thêm (CA chuyên dùng)."""
+    return trust_store_dir() / "internal"
+
+
+def trust_sources_path() -> Path:
+    """Danh mục URL nguồn chính thức (rootca.gov.vn) để tải kho."""
+    return trust_store_dir() / "sources.yaml"
+
+
+def ca_registry_path() -> Path:
+    """Danh sách 26 CA công cộng làm MỐC ĐỐI SOÁT (không dùng nhận diện)."""
+    return trust_store_dir() / "ca_registry.yaml"
+
+
+def trust_audit_log_path() -> Path:
+    """Nhật ký thay đổi kho tin cậy (áp dụng sync / thêm neo nội bộ)."""
+    return trust_store_dir() / "audit.log"
+
+
+def trust_signing_pub_path() -> Path:
+    """Khoá CÔNG KHAI ghim sẵn (phía code) để verify chữ ký kho tin cậy.
+
+    Đặt NGOÀI thư mục kho có thể thay đổi — coi như một phần của mã nguồn tin
+    cậy. Khoá bí mật tương ứng do người vận hành/build giữ.
+    """
+    return data_dir() / "trust_signing_pub.pem"
+
+
 def compliance_dir() -> Path:
     return data_dir() / "compliance"
 
@@ -72,6 +111,13 @@ __all__ = [
     "repo_root",
     "data_dir",
     "trust_store_dir",
+    "current_trust_store_dir",
+    "trust_store_staging_dir",
+    "trust_store_internal_dir",
+    "trust_sources_path",
+    "ca_registry_path",
+    "trust_audit_log_path",
+    "trust_signing_pub_path",
     "compliance_dir",
     "vendor_intel_path",
     "appendix_i_path",

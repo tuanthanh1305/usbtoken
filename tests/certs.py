@@ -42,6 +42,7 @@ def _make(
     is_ca: bool,
     not_before: datetime | None = None,
     not_after: datetime | None = None,
+    with_keyids: bool = False,
 ) -> IssuedCert:
     key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
     subject = _name(subject_cn)
@@ -66,6 +67,15 @@ def _make(
         .not_valid_after(na)
         .add_extension(x509.BasicConstraints(ca=is_ca, path_length=None), critical=True)
     )
+    if with_keyids:
+        # SKI của chính cert + AKI trỏ tới khoá của issuer (để test find_issuer mạnh).
+        builder = builder.add_extension(
+            x509.SubjectKeyIdentifier.from_public_key(key.public_key()), critical=False
+        )
+        issuer_pub = (issuer.key if issuer else key).public_key()
+        builder = builder.add_extension(
+            x509.AuthorityKeyIdentifier.from_issuer_public_key(issuer_pub), critical=False
+        )
     cert = builder.sign(private_key=signing_key, algorithm=hashes.SHA256())
     return IssuedCert(cert=cert, key=key)
 

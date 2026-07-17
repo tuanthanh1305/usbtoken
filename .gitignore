@@ -28,6 +28,12 @@ data/trust_store/*.der
 data/trust_store/*.pem
 data/trust_store/*.crt
 data/trust_store/_downloaded/
+data/trust_store/_staging/
+data/trust_store/current/
+data/trust_store/internal/
+data/trust_store/audit.log
+# Khoá công khai ghim sẵn: PRODUCTION commit bản thật (chỉ-đọc); dev sinh tự động.
+data/trust_signing_pub.pem
 
 # --- OS / editor ---
 .DS_Store

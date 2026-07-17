@@ -1,0 +1,42 @@
+# ca_registry.yaml — DANH SÁCH 26 CA CÔNG CỘNG (MỐC ĐỐI SOÁT).
+#
+# ⚠️ Danh sách này CHỈ để ĐỐI SOÁT khi sync (kiểm xem đã tải đủ chứng thư của các
+#    CA đang được cấp phép chưa). TUYỆT ĐỐI KHÔNG dùng để NHẬN DIỆN CA — nhận diện
+#    CA làm bằng chain building mật mã (core/trust/chain.py), không so tên.
+#
+# Nguồn: https://rootca.gov.vn (mục "THÔNG TIN CÁC CA CÔNG CỘNG").
+# Danh sách BIẾN ĐỘNG: Bộ KH&CN cấp phép CA mới sẽ làm thay đổi. Kiến trúc chịu
+# được thay đổi mà KHÔNG sửa code — chỉ cập nhật file dữ liệu này + sources.yaml.
+
+as_of: "2026-07-17"          # thời điểm chốt danh sách làm mốc
+source: "https://rootca.gov.vn"
+count: 26
+
+# LƯU Ý: CA2, SmartSign, I-CA là BA CA RIÊNG BIỆT — không gộp.
+public_cas:
+  - "BkavCA"
+  - "FPT-CA"
+  - "Viettel-CA"
+  - "VNPT-CA"
+  - "CA2"
+  - "Safe-CA"
+  - "SmartSign"
+  - "Newtel-CA"
+  - "EFY-CA"
+  - "TrustCA"
+  - "MISA-CA"
+  - "NC-CA"
+  - "LCS-CA"
+  - "CMC-CA"
+  - "EASYCA"
+  - "FASTCA"
+  - "I-CA"
+  - "Hilo-CA"
+  - "ONE-CA"
+  - "WINCA"
+  - "MATBAO-CA"
+  - "E-CA"
+  - "MOBIFONE CA"
+  - "VNPAY-CA"
+  - "IntrustCA"
+  - "MK CA"

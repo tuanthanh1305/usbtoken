@@ -1,0 +1,53 @@
+# sources.yaml — DANH MỤC NGUỒN TẢI KHO NEO TIN CẬY.
+#
+# ⚠️ CHỈ chấp nhận URL HTTPS thuộc miền chính thức rootca.gov.vn. Công cụ
+#    tools/sync_trust_store.py sẽ TỪ CHỐI mọi URL khác miền hoặc không phải https.
+#
+# Điền URL THẬT từ https://rootca.gov.vn (không đoán). Thêm CA mới = thêm một mục
+# vào danh sách `items` — KHÔNG cần sửa code (kiến trúc chịu được thay đổi).
+#
+# role: root | crl | ca | tsa | foreign
+#   root    — chứng thư gốc Vietnam National Root CA (neo tin cậy DUY NHẤT)
+#   crl     — CRL của Root
+#   ca      — chứng thư một CA công cộng
+#   foreign — CA/CTCKS nước ngoài được công nhận (TT 06/2024/TT-BTTTT)
+
+source_host: "rootca.gov.vn"
+
+items:
+  - role: root
+    name: "neac_root_ca"
+    url: ""            # ĐIỀN: URL chứng thư gốc từ mục "CTCKS ROOTCA"
+
+  - role: crl
+    name: "neac_root_crl"
+    url: ""            # ĐIỀN: URL CRL từ mục "DANH SÁCH CTCKS THU HỒI"
+
+  # --- 26 CA công cộng (điền url từ mục "THÔNG TIN CÁC CA CÔNG CỘNG") --------
+  # Ví dụ khung; url để trống -> công cụ báo "chưa cấu hình" và bỏ qua an toàn.
+  - { role: ca, name: "BkavCA",     url: "" }
+  - { role: ca, name: "FPT-CA",     url: "" }
+  - { role: ca, name: "Viettel-CA", url: "" }
+  - { role: ca, name: "VNPT-CA",    url: "" }
+  - { role: ca, name: "CA2",        url: "" }
+  - { role: ca, name: "Safe-CA",    url: "" }
+  - { role: ca, name: "SmartSign",  url: "" }
+  - { role: ca, name: "Newtel-CA",  url: "" }
+  - { role: ca, name: "EFY-CA",     url: "" }
+  - { role: ca, name: "TrustCA",    url: "" }
+  - { role: ca, name: "MISA-CA",    url: "" }
+  - { role: ca, name: "NC-CA",      url: "" }
+  - { role: ca, name: "LCS-CA",     url: "" }
+  - { role: ca, name: "CMC-CA",     url: "" }
+  - { role: ca, name: "EASYCA",     url: "" }
+  - { role: ca, name: "FASTCA",     url: "" }
+  - { role: ca, name: "I-CA",       url: "" }
+  - { role: ca, name: "Hilo-CA",    url: "" }
+  - { role: ca, name: "ONE-CA",     url: "" }
+  - { role: ca, name: "WINCA",      url: "" }
+  - { role: ca, name: "MATBAO-CA",  url: "" }
+  - { role: ca, name: "E-CA",       url: "" }
+  - { role: ca, name: "MOBIFONE-CA", url: "" }
+  - { role: ca, name: "VNPAY-CA",   url: "" }
+  - { role: ca, name: "IntrustCA",  url: "" }
+  - { role: ca, name: "MK-CA",      url: "" }
