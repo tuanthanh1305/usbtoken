@@ -6,7 +6,6 @@ và đường dẫn tới kho neo tin cậy + bảng Phụ lục I/II.
 
 from __future__ import annotations
 
-import functools
 from pathlib import Path
 from typing import Any
 
@@ -91,10 +90,8 @@ def _load_yaml(path: Path) -> dict[str, Any]:
     return data if isinstance(data, dict) else {}
 
 
-@functools.lru_cache(maxsize=1)
-def load_vendor_intel() -> dict[str, Any]:
-    """Nạp bảng thông tin nhà cung cấp (Track A theo chip + Track B CA rebrand)."""
-    return _load_yaml(vendor_intel_path())
+# Ghi chú: bảng vàng vendor_intel.yaml được nạp qua ``core/intel.py`` (có
+# validate schema + ghi đè). Không đọc trực tiếp ở đây nữa.
 
 
 def load_appendix_i() -> dict[str, Any]:
@@ -122,7 +119,6 @@ __all__ = [
     "vendor_intel_path",
     "appendix_i_path",
     "appendix_ii_path",
-    "load_vendor_intel",
     "load_appendix_i",
     "load_appendix_ii",
 ]

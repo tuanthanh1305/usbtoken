@@ -44,7 +44,18 @@ chain building bằng mật mã.**
   `aetpkss1.dll`, `opensc-pkcs11.so`…
 - **Track B — CA REBRAND**: `/usr/lib/fptca_v4.so` (**ĐÃ XÁC NHẬN**, gói dpkg
   `fptca-4.0`). Hệ thống chỉ quét Track A sẽ **KHÔNG BAO GIỜ** dò ra FPT-CA trên
-  Linux. Dữ liệu ở `data/vendor_intel.yaml`.
+  Linux.
+
+**Bảng vàng tách khỏi code**: dữ liệu ở `data/vendor_intel.yaml`, nạp qua
+`core/intel.py` (validate schema + index + ghi đè qua `VN_TOKEN_INTEL_FILE` và
+file người dùng ở `config_dir`). Mức tin cậy: `confirmed` (từ token/bộ cài thật)
+› `documented` (tên điển hình, khác theo phiên bản) › `hypothesis` (**chưa biết
+tên file — filenames RỖNG**, để Tầng 4 tự dò bằng glob + `C_GetInfo`). 25 CA công
+cộng còn lại là `hypothesis` — **tuyệt đối không hard-code tên file đoán mò**.
+
+```bash
+python -m core.intel --list --os linux --track B   # xem bảng vàng đã lọc
+```
 
 ## Quy tắc kiến trúc bất khả xâm phạm
 

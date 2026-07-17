@@ -1,61 +1,172 @@
-# vendor_intel.yaml — BẢNG THÔNG TIN NHÀ CUNG CẤP MODULE PKCS#11 (TRỤC 1).
+# ============================================================================
+# vendor_intel.yaml — BẢNG VÀNG (TÁCH HOÀN TOÀN KHỎI CODE).
+# ============================================================================
+# TRỤC 1 (MODULE): "CÁCH nạp". Đây là DỮ LIỆU, không phải logic. Thêm/sửa nhà
+# cung cấp = sửa file này, KHÔNG sửa code.
 #
-# Đây là DỮ LIỆU (biến động được), KHÔNG phải logic. Bổ sung nhà cung cấp mới =
-# thêm một mục, không sửa code.
+# Schema mỗi entry (core/intel.py validate):
+#   id            : định danh duy nhất
+#   track         : A (theo chip) | B (CA rebrand)
+#   os            : windows | macos | linux | any
+#   chip_vendor   : (track A) nhà sản xuất chip
+#   ca_hint       : (track B) CA phát hành module — GỢI Ý, không phải nhận diện
+#   filenames     : danh sách tên file (RỖNG nếu chưa xác nhận — KHÔNG đoán)
+#   search_paths  : thư mục đặc thù (bổ sung ngoài mặc định theo OS)
+#   glob_hints    : mẫu glob cho Tầng 4 tự dò khi chưa biết tên file
+#   package_name  : tên gói cài (nếu có)
+#   confidence    : confirmed | documented | hypothesis
+#   evidence      : căn cứ
+#   arch_warning  : cảnh báo kiến trúc (nếu có)
 #
-# HAI NHÁNH:
-#   track_a — theo CHIP: tên file middleware của nhà sản xuất chip.
-#   track_b — CA REBRAND: module do một CA phát hành riêng (không mang tên chip).
-#
-# ⚠️ chip_hint/ca_hint chỉ là GỢI Ý từ tên file — KHÔNG có giá trị pháp lý.
-#    - Chip THẬT: đọc qua C_GetTokenInfo().manufacturerID (TRỤC 2).
-#    - CA THẬT:   xác định bằng chain building (TRỤC 3, core/trust).
+# ⚠️ confidence:
+#   confirmed  = xác nhận từ token/bộ cài thật.
+#   documented = tên điển hình nhưng KHÁC theo phiên bản middleware.
+#   hypothesis = CHƯA biết tên file — filenames PHẢI rỗng, để Tầng 4 tự phát hiện.
+# Trong dự án quốc gia, một tên file ĐOÁN SAI còn tệ hơn không có.
 
-track_a:
-  - vendor: "SafeNet/Thales"
-    windows: ["eTPKCS11.dll"]
-    macos: ["libeTPkcs11.dylib"]
-    linux: ["libeToken.so", "libeTPkcs11.so"]
+version: 1
 
-  - vendor: "Feitian ePass2003"
-    windows: ["eps2003csp11.dll", "ShuttleCsp11_3003.dll", "ngp11v211.dll"]
-    macos: ["libShuttleCsp11_3003.dylib", "libcastle.dylib"]
-    linux: ["libcastle.so", "libeps2003csp11.so"]
+# Đường dẫn tìm kiếm MẶC ĐỊNH theo OS (bổ sung cho library_search_paths của adapter).
+search_paths:
+  windows:
+    - "C:\\Windows\\System32"      # DLL 64-bit
+    - "C:\\Windows\\SysWOW64"      # DLL 32-BIT — BẮT BUỘC quét
+    - "C:\\Program Files"
+    - "C:\\Program Files (x86)"
+  macos:
+    - "/Library/OpenSC/lib"
+    - "/usr/local/lib"             # Homebrew (Intel)
+    - "/opt/homebrew/lib"          # Homebrew (APPLE SILICON!)
+    - "/Library/Frameworks"
+    - "/Applications"
+    # BỎ /usr/lib — SIP khoá, không chứa middleware bên thứ ba.
+  linux:
+    - "/usr/lib"                   # PHẲNG — nơi FPT đặt fptca_v4.so!
+    - "/usr/lib64"
+    - "/usr/lib/x86_64-linux-gnu"
+    - "/usr/local/lib"
+    - "/lib"
+    - "/opt"
 
-  - vendor: "Watchdata"
-    windows: ["WDPKCS.dll"]
-    macos: ["libwdpkcs.dylib"]
-    linux: ["libwdpkcs.so"]
-    extra_dirs:
-      macos: ["/usr/local/lib/watchdata/lib"]
+# ---------------------------------------------------------------------------
+# TRACK A — theo CHIP (confidence: documented)
+# ---------------------------------------------------------------------------
+entries:
+  # SafeNet / Thales (eToken)
+  - { id: safenet_win,   track: A, os: windows, chip_vendor: "SafeNet/Thales",
+      filenames: ["eTPKCS11.dll"], confidence: documented,
+      evidence: "Tên PKCS#11 điển hình của SafeNet Authentication Client." }
+  - { id: safenet_mac,   track: A, os: macos,   chip_vendor: "SafeNet/Thales",
+      filenames: ["libeTPkcs11.dylib"], confidence: documented,
+      evidence: "Tên điển hình; có thể khác theo phiên bản." }
+  - { id: safenet_linux, track: A, os: linux,   chip_vendor: "SafeNet/Thales",
+      filenames: ["libeToken.so", "libeTPkcs11.so"], confidence: documented,
+      evidence: "Tên điển hình; có thể khác theo phiên bản." }
 
-  - vendor: "SafeSign"
-    windows: ["aetpkss1.dll"]
-    macos: ["libaetpkss.dylib"]
-    linux: ["libaetpkss.so"]
+  # Feitian (ePass2003 / Castle)
+  - { id: feitian_win,   track: A, os: windows, chip_vendor: "Feitian",
+      filenames: ["eps2003csp11.dll", "ShuttleCsp11_3003.dll", "ngp11v211.dll"],
+      confidence: documented, evidence: "Các tên phổ biến theo dòng ePass2003." }
+  - { id: feitian_mac,   track: A, os: macos,   chip_vendor: "Feitian",
+      filenames: ["libShuttleCsp11_3003.dylib", "libcastle.dylib"],
+      confidence: documented, evidence: "Tên điển hình dòng Castle/Shuttle." }
+  - { id: feitian_linux, track: A, os: linux,   chip_vendor: "Feitian",
+      filenames: ["libcastle.so"], confidence: documented,
+      evidence: "Tên điển hình dòng Castle." }
 
-  - vendor: "Gemalto"
-    windows: ["gclib.dll"]
-    macos: ["libgclib.dylib"]
-    linux: ["libgclib.so"]
+  # Watchdata
+  - { id: watchdata_win,   track: A, os: windows, chip_vendor: "Watchdata",
+      filenames: ["WDPKCS.dll"], confidence: documented, evidence: "Tên điển hình Watchdata." }
+  - { id: watchdata_mac,   track: A, os: macos,   chip_vendor: "Watchdata",
+      filenames: ["libwdpkcs.dylib"], search_paths: ["/usr/local/lib/watchdata/lib"],
+      confidence: documented, evidence: "Tên điển hình Watchdata." }
+  - { id: watchdata_linux, track: A, os: linux,   chip_vendor: "Watchdata",
+      filenames: ["libwdpkcs.so"], confidence: documented, evidence: "Tên điển hình Watchdata." }
 
-  - vendor: "OpenSC"
-    windows: ["opensc-pkcs11.dll"]
-    # LƯU Ý: OpenSC trên macOS vẫn dùng đuôi .so (không phải .dylib).
-    macos: ["opensc-pkcs11.so"]
-    linux: ["opensc-pkcs11.so"]
+  # SafeSign (A.E.T.)
+  - { id: safesign_win,   track: A, os: windows, chip_vendor: "SafeSign",
+      filenames: ["aetpkss1.dll"], confidence: documented, evidence: "Tên điển hình SafeSign." }
+  - { id: safesign_mac,   track: A, os: macos,   chip_vendor: "SafeSign",
+      filenames: ["libaetpkss.dylib"], confidence: documented, evidence: "Tên điển hình SafeSign." }
+  - { id: safesign_linux, track: A, os: linux,   chip_vendor: "SafeSign",
+      filenames: ["libaetpkss.so"], confidence: documented, evidence: "Tên điển hình SafeSign." }
 
-  - vendor: "p11-kit proxy"
-    macos: ["p11-kit-proxy.dylib"]
-    linux: ["p11-kit-proxy.so"]
+  # Gemalto
+  - { id: gemalto_win,   track: A, os: windows, chip_vendor: "Gemalto",
+      filenames: ["gclib.dll"], confidence: documented, evidence: "Tên điển hình Gemalto." }
+  - { id: gemalto_mac,   track: A, os: macos,   chip_vendor: "Gemalto",
+      filenames: ["libgclib.dylib"], confidence: documented, evidence: "Tên điển hình Gemalto." }
+  - { id: gemalto_linux, track: A, os: linux,   chip_vendor: "Gemalto",
+      filenames: ["libgclib.so"], confidence: documented, evidence: "Tên điển hình Gemalto." }
 
-track_b:
-  # FPT-CA phát hành module PKCS#11 RIÊNG, không mang tên chip.
-  # ĐÃ XÁC NHẬN: gói dpkg "fptca-4.0" cài /usr/lib/fptca_v4.so trên Linux.
-  # Hệ thống chỉ quét Track A sẽ KHÔNG BAO GIỜ dò ra FPT-CA trên Linux.
-  - ca_hint: "FPT-CA"
-    note: "gói dpkg fptca-4.0 — ĐÃ XÁC NHẬN"
-    linux: ["fptca_v4.so"]
-    linux_paths: ["/usr/lib/fptca_v4.so"]
-    windows: []
-    macos: []
+  # OpenSC (LƯU Ý: macOS vẫn dùng .so, không phải .dylib)
+  - { id: opensc_win,   track: A, os: windows, chip_vendor: "OpenSC",
+      filenames: ["opensc-pkcs11.dll"], confidence: documented, evidence: "OpenSC chuẩn." }
+  - { id: opensc_mac,   track: A, os: macos,   chip_vendor: "OpenSC",
+      filenames: ["opensc-pkcs11.so"], confidence: documented,
+      evidence: "OpenSC trên macOS vẫn giữ đuôi .so." }
+  - { id: opensc_linux, track: A, os: linux,   chip_vendor: "OpenSC",
+      filenames: ["opensc-pkcs11.so"], confidence: documented, evidence: "OpenSC chuẩn." }
+
+  # p11-kit proxy (Windows KHÔNG có)
+  - { id: p11kit_mac,   track: A, os: macos, chip_vendor: "p11-kit proxy",
+      filenames: ["p11-kit-proxy.dylib"], confidence: documented, evidence: "Proxy p11-kit." }
+  - { id: p11kit_linux, track: A, os: linux, chip_vendor: "p11-kit proxy",
+      filenames: ["p11-kit-proxy.so"], confidence: documented, evidence: "Proxy p11-kit." }
+
+  # -------------------------------------------------------------------------
+  # TRACK B — CA REBRAND (chỉ MỘT entry confirmed)
+  # -------------------------------------------------------------------------
+  - id: fptca_linux_v4
+    track: B
+    os: linux
+    ca_hint: "FPT-CA"
+    filenames: ["fptca_v4.so"]
+    search_paths: ["/usr/lib"]
+    package_name: "fptca-4.0"
+    confidence: confirmed
+    evidence: >-
+      readme.txt + install.sh, bộ cài FPT Token Manager 4.0 for Ubuntu, từ USB
+      token thật.
+    arch_warning: >-
+      Đường dẫn PHẲNG /usr/lib + target Ubuntu>=10.10 (2010) → NGHI ELF32. Verify
+      bằng `file`. Nếu ELF32 trên host 64-bit → BẮT BUỘC qua arch bridge.
+
+# ---------------------------------------------------------------------------
+# 25 CA công cộng còn lại — confidence: hypothesis.
+# KHÔNG hard-code tên file (đoán sai còn tệ hơn không có). filenames rỗng;
+# core/intel.py sinh entry track B (os=any) với glob_hints để Tầng 4 tự phát
+# hiện qua glob + C_GetInfo (đọc thông tin token thật).
+# ---------------------------------------------------------------------------
+hypothesis_cas:
+  confidence: hypothesis
+  glob_hints: ["*ca*.so", "*token*.so", "*pkcs*.so"]
+  evidence: >-
+    CA công cộng được Bộ KH&CN cấp phép; tên file module CHƯA xác nhận. Danh
+    sách BIẾN ĐỘNG — để Tầng 4 (glob + C_GetInfo) tự phát hiện.
+  names:
+    - "BkavCA"
+    - "Viettel-CA"
+    - "VNPT-CA"
+    - "CA2"
+    - "Safe-CA"
+    - "SmartSign"
+    - "Newtel-CA"
+    - "EFY-CA"
+    - "TrustCA"
+    - "MISA-CA"
+    - "NC-CA"
+    - "LCS-CA"
+    - "CMC-CA"
+    - "EASYCA"
+    - "FASTCA"
+    - "I-CA"
+    - "Hilo-CA"
+    - "ONE-CA"
+    - "WINCA"
+    - "MATBAO-CA"
+    - "E-CA"
+    - "MOBIFONE CA"
+    - "VNPAY-CA"
+    - "IntrustCA"
+    - "MK CA"
