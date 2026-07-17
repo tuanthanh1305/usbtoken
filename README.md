@@ -124,7 +124,8 @@ vn-esign-suite/
 python -m venv .venv && source .venv/bin/activate
 pip install -r requirements-dev.txt
 
-python -m tools.diagnose          # chẩn đoán môi trường + tuân thủ
+python -m core.platform --diagnose   # chẩn đoán OS/arch/module/PC/SC (per-OS)
+python -m tools.diagnose             # (bí danh tương đương)
 python -m service.main            # daemon http://127.0.0.1:8787
 cd web && npm install && npm run dev   # UI http://localhost:5173
 

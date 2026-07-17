@@ -1,4 +1,4 @@
-"""Adapter macOS — TRỤC 1. Kỹ về Apple Silicon (Rosetta 2). Keychain là fallback."""
+"""Adapter macOS — TRỤC 1. Kỹ nhất về Apple Silicon (Rosetta 2). Keychain là fallback."""
 
 from __future__ import annotations
 
@@ -10,6 +10,7 @@ import sys
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from core.config import text_matches_ca_keyword
 from core.errors import BridgeUnavailableError
 
 from .base import (
@@ -22,6 +23,9 @@ from .base import (
 
 if TYPE_CHECKING:
     from core.bridge.client import BridgeClient
+
+# pcsc-lite từ Homebrew — xung đột với PCSC.framework sẵn có của macOS.
+_HOMEBREW_PCSCD = (Path("/opt/homebrew/bin/pcscd"), Path("/usr/local/bin/pcscd"))
 
 
 class MacOSAdapter(PlatformAdapter):
@@ -36,25 +40,18 @@ class MacOSAdapter(PlatformAdapter):
 
     # -- Định vị module ------------------------------------------------- #
     def library_search_paths(self) -> list[Path]:
-        """OpenSC, Homebrew (Intel /usr/local & Apple Silicon /opt/homebrew),
-        watchdata, các framework, và trong .app. BỎ QUA /usr/lib (SIP khoá)."""
+        """OpenSC, Homebrew (Intel /usr/local & Apple Silicon /opt/homebrew — ĐỔI
+        PREFIX, cực hay quên), watchdata, các framework. BỎ /usr/lib (SIP khoá)."""
         paths: list[Path] = [
             Path("/Library/OpenSC/lib"),
             Path("/usr/local/lib"),
-            Path("/opt/homebrew/lib"),
+            Path("/opt/homebrew/lib"),  # APPLE SILICON!
             Path("/usr/local/lib/watchdata/lib"),
             Path.home() / "lib",
         ]
         fw_root = Path("/Library/Frameworks")
         if fw_root.is_dir():
             paths.extend(fw_root.glob("*.framework/Versions/A"))
-        apps = Path("/Applications")
-        if apps.is_dir():
-            for app in apps.glob("*.app"):
-                for sub in ("MacOS", "Frameworks", "PlugIns"):
-                    d = app / "Contents" / sub
-                    if d.is_dir():
-                        paths.append(d)
         return paths
 
     def glob_patterns(self) -> list[str]:
@@ -62,17 +59,46 @@ class MacOSAdapter(PlatformAdapter):
         return ["*.dylib", "*.so"]
 
     def discover_from_system(self) -> list[Path]:
+        """TẦNG 1 — công cụ hệ thống macOS.
+
+        * ``system_profiler SPSmartCardsDataType`` (plist, có thể chứa path).
+        * Bundle ``tokend``.
+        * Quét ``/Applications/*.app`` mà TÊN app khớp từ khoá CA -> tìm .dylib/.so
+          trong Contents/{MacOS,Frameworks,Resources}.
+        Chỉ trả file TỒN TẠI THỰC TẾ.
+        """
         found: list[Path] = []
+
         raw = self._run(["system_profiler", "-xml", "SPSmartCardsDataType"])
         if raw:
             try:
                 found.extend(self._paths_from_plist(plistlib.loads(raw)))
             except plistlib.InvalidFileException:
                 pass
+
         tokend = Path("/Library/Security/tokend")
         if tokend.is_dir():
             found.extend(tokend.glob("*/Contents/MacOS/*"))
-        return [p for p in found if p]
+
+        found.extend(self._scan_ca_applications())
+        return [p for p in found if p.is_file()]
+
+    @staticmethod
+    def _scan_ca_applications() -> list[Path]:
+        """Quét các .app của CA (tên khớp từ khoá) tìm module PKCS#11."""
+        out: list[Path] = []
+        apps = Path("/Applications")
+        if not apps.is_dir():
+            return out
+        for app in apps.glob("*.app"):
+            if not text_matches_ca_keyword(app.stem):
+                continue
+            for sub in ("MacOS", "Frameworks", "Resources"):
+                d = app / "Contents" / sub
+                if d.is_dir():
+                    for pat in ("*.dylib", "*.so"):
+                        out.extend(d.glob(pat))
+        return out
 
     @staticmethod
     def _paths_from_plist(data: object) -> list[Path]:
@@ -125,7 +151,8 @@ class MacOSAdapter(PlatformAdapter):
         return BinaryArch.UNKNOWN
 
     def needs_arch_bridge(self, lib_path: Path) -> bool:
-        """True nếu host arm64 mà dylib CHỈ có x86_64 (phổ biến với token VN)."""
+        """True nếu host arm64 NATIVE mà dylib CHỈ có x86_64 (phổ biến nhất với
+        middleware CA Việt Nam). Universal (có cả hai slice) KHÔNG cần cầu nối."""
         arch = self.check_binary_arch(lib_path)
         if arch in (BinaryArch.UNIVERSAL, BinaryArch.UNKNOWN):
             return False
@@ -175,29 +202,61 @@ class MacOSAdapter(PlatformAdapter):
                 "Phần cứng Apple Silicon: middleware token thường chỉ có .dylib "
                 "x86_64 -> cần helper cầu nối qua Rosetta 2 (arch -x86_64)."
             )
+        # Library Validation (thường gặp khi dlopen dylib x86_64/ký khác team).
+        notes.append(
+            "Library Validation: nếu dlopen báo 'code signature not valid for use in "
+            "process', tiến trình host thiếu entitlement "
+            "com.apple.security.cs.disable-library-validation. Bản đóng gói phải bật "
+            "entitlement này để nạp module PKCS#11 của bên thứ ba."
+        )
+        # Xung đột pcsc-lite từ Homebrew.
+        conflict = self._homebrew_pcscd()
+        if conflict is not None:
+            notes.append(
+                f"Phát hiện pcscd của Homebrew tại {conflict} — có thể XUNG ĐỘT với "
+                "PCSC.framework sẵn có của macOS. Cân nhắc gỡ: brew uninstall pcsc-lite."
+            )
+        # Số token CryptoTokenKit.
+        ctk = self._run(["pluginkit", "-m", "-p", "com.apple.ctk-tokens"])
+        if ctk and ctk.strip():
+            count = len([ln for ln in ctk.decode("utf-8", "ignore").splitlines() if ln.strip()])
+            notes.append(f"CryptoTokenKit: {count} token extension đã đăng ký.")
         return notes
 
     def library_warnings(self, path: Path) -> list[str]:
+        warns: list[str] = []
         proc = self._run_proc(["xattr", "-p", "com.apple.quarantine", str(path)])
         if proc is not None and proc.returncode == 0 and proc.stdout.strip():
-            return [
+            warns.append(
                 "Thư viện bị cờ quarantine (Gatekeeper có thể chặn nạp). Gỡ bằng:\n"
                 f"    xattr -d com.apple.quarantine '{path}'"
-            ]
-        return []
+            )
+        return warns
+
+    @staticmethod
+    def _homebrew_pcscd() -> Path | None:
+        for p in _HOMEBREW_PCSCD:
+            if p.exists():
+                return p
+        return None
 
     # -- PC/SC & fallback ----------------------------------------------- #
     def pcsc_backend_ready(self) -> tuple[bool, str]:
+        conflict = self._homebrew_pcscd()
+        conflict_note = (
+            f"\n⚠️ Có pcscd Homebrew ({conflict}) có thể xung đột PCSC.framework."
+            if conflict else ""
+        )
         try:
             from smartcard.System import readers  # type: ignore[import-untyped]
 
             readers()
-            return True, ""
+            return True, conflict_note.strip()
         except Exception:  # noqa: BLE001
             return False, (
                 "Chưa truy cập được PC/SC trên macOS. Kiểm tra token đã cắm; nếu "
                 "cần driver CCID bên thứ ba, cài rồi thử lại. Liệt kê token: "
-                "pluginkit -m -p com.apple.ctk-tokens"
+                "pluginkit -m -p com.apple.ctk-tokens" + conflict_note
             )
 
     def certstore_fallback(self) -> list[bytes]:

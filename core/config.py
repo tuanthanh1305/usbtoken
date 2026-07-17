@@ -94,6 +94,43 @@ def _load_yaml(path: Path) -> dict[str, Any]:
 # validate schema + ghi đè). Không đọc trực tiếp ở đây nữa.
 
 
+def load_ca_registry() -> dict[str, Any]:
+    """Nạp danh sách 26 CA công cộng (mốc đối soát)."""
+    return _load_yaml(ca_registry_path())
+
+
+def ca_registry_names() -> list[str]:
+    """Tên 26 CA công cộng (từ ca_registry.yaml)."""
+    reg = load_ca_registry()
+    names = reg.get("public_cas") or []
+    return [str(n) for n in names] if isinstance(names, list) else []
+
+
+# Từ khoá chung để lọc gói/phần mềm CA (ngoài tên 26 CA). Cố ý KHÔNG dùng bare
+# "ca" (quá rộng, gây dương tính giả) — ưu tiên độ chính xác cho dự án quốc gia.
+_GENERIC_CA_KEYWORDS = (
+    "token", "pkcs", "smartcard", "smart card", "esign", "e-sign",
+    "ký số", "chữ ký số", "chu ky so", "chukyso",
+)
+
+
+def ca_discovery_keywords() -> list[str]:
+    """Danh sách từ khoá (viết thường) để dò gói/phần mềm CA ở Tầng 1."""
+    kws = [n.lower() for n in ca_registry_names()]
+    kws.extend(_GENERIC_CA_KEYWORDS)
+    # Khử trùng lặp giữ thứ tự.
+    seen: dict[str, None] = {}
+    for k in kws:
+        seen.setdefault(k.strip(), None)
+    return [k for k in seen if k]
+
+
+def text_matches_ca_keyword(text: str) -> bool:
+    """True nếu ``text`` (không phân biệt hoa thường) chứa một từ khoá CA."""
+    low = text.lower()
+    return any(kw in low for kw in ca_discovery_keywords())
+
+
 def load_appendix_i() -> dict[str, Any]:
     """Nạp Phụ lục I (tiêu chuẩn kỹ thuật) — PHẢI được điền từ bản gốc TT 15/2025."""
     return _load_yaml(appendix_i_path())
@@ -119,6 +156,10 @@ __all__ = [
     "vendor_intel_path",
     "appendix_i_path",
     "appendix_ii_path",
+    "load_ca_registry",
+    "ca_registry_names",
+    "ca_discovery_keywords",
+    "text_matches_ca_keyword",
     "load_appendix_i",
     "load_appendix_ii",
 ]

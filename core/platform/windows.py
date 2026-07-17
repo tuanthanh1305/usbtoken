@@ -7,6 +7,8 @@ import subprocess
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from core.config import text_matches_ca_keyword
+
 from .base import (
     BinaryArch,
     HostArch,
@@ -50,7 +52,13 @@ class WindowsAdapter(PlatformAdapter):
         return ["*.dll"]
 
     def discover_from_system(self) -> list[Path]:
-        """Đọc Registry: Uninstall\\*\\InstallLocation + Cryptography Providers."""
+        """TẦNG 1 — đọc Windows Registry (winreg).
+
+        * ``...\\Uninstall\\*`` (+ WOW6432Node): LỌC ``DisplayName`` chứa từ khoá
+          CA (26 tên CA + "token"/"ký số"/...) -> ``InstallLocation`` -> quét *.dll.
+        * ``...\\Cryptography\\Defaults\\Provider``: đường dẫn CSP/KSP đã đăng ký.
+        Chỉ trả file .dll TỒN TẠI THỰC TẾ.
+        """
         try:
             import winreg  # type: ignore[import-not-found]
         except ImportError:
@@ -60,7 +68,16 @@ class WindowsAdapter(PlatformAdapter):
         windir = Path(os.environ.get("WINDIR", r"C:\Windows"))
         system32 = windir / "System32"
 
-        # CSP/KSP đã đăng ký -> Image Path.
+        # (1) Uninstall -> lọc theo DisplayName -> InstallLocation -> *.dll
+        for subkey in (
+            r"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall",
+            r"SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall",
+        ):
+            for install_dir in self._enum_ca_install_locations(winreg, subkey):
+                if install_dir.is_dir():
+                    found.extend(install_dir.rglob("*.dll"))
+
+        # (2) Cryptography Defaults Provider -> Image Path
         for subkey in (
             r"SOFTWARE\Microsoft\Cryptography\Defaults\Provider",
             r"SOFTWARE\WOW6432Node\Microsoft\Cryptography\Defaults\Provider",
@@ -69,15 +86,40 @@ class WindowsAdapter(PlatformAdapter):
                 p = Path(image)
                 found.append(p if p.is_absolute() else system32 / p.name)
 
-        # Thư mục cài của phần mềm middleware (InstallLocation).
-        for subkey in (
-            r"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall",
-            r"SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall",
-        ):
-            for install_dir in self._enum_install_locations(winreg, subkey):
-                if install_dir.is_dir():
-                    found.extend(install_dir.glob("*.dll"))
         return found
+
+    @staticmethod
+    def _enum_ca_install_locations(winreg_mod, subkey: str) -> list[Path]:  # type: ignore[no-untyped-def]
+        """Duyệt Uninstall, chỉ lấy InstallLocation của phần mềm CA/token.
+
+        Lọc bằng ``DisplayName`` (hoặc ``Publisher``) khớp từ khoá CA — tránh
+        quét toàn bộ phần mềm cài trên máy (nhiễu + chậm).
+        """
+        out: list[Path] = []
+        try:
+            root = winreg_mod.OpenKey(winreg_mod.HKEY_LOCAL_MACHINE, subkey)
+        except OSError:
+            return out
+        with root:
+            idx = 0
+            while True:
+                try:
+                    child_name = winreg_mod.EnumKey(root, idx)
+                except OSError:
+                    break
+                idx += 1
+                try:
+                    with winreg_mod.OpenKey(root, child_name) as child:
+                        display = _query(winreg_mod, child, "DisplayName")
+                        publisher = _query(winreg_mod, child, "Publisher")
+                        location = _query(winreg_mod, child, "InstallLocation")
+                except OSError:
+                    continue
+                if not location:
+                    continue
+                if text_matches_ca_keyword(display) or text_matches_ca_keyword(publisher):
+                    out.append(Path(location.strip()))
+        return out
 
     @staticmethod
     def _enum_provider_images(winreg_mod, subkey: str) -> list[str]:  # type: ignore[no-untyped-def]
@@ -96,39 +138,19 @@ class WindowsAdapter(PlatformAdapter):
                 idx += 1
                 try:
                     with winreg_mod.OpenKey(root, child_name) as child:
-                        image, _ = winreg_mod.QueryValueEx(child, "Image Path")
+                        image = _query(winreg_mod, child, "Image Path")
                 except OSError:
                     continue
-                if isinstance(image, str) and image.strip():
+                if image.strip():
                     out.append(image.strip())
-        return out
-
-    @staticmethod
-    def _enum_install_locations(winreg_mod, subkey: str) -> list[Path]:  # type: ignore[no-untyped-def]
-        out: list[Path] = []
-        try:
-            root = winreg_mod.OpenKey(winreg_mod.HKEY_LOCAL_MACHINE, subkey)
-        except OSError:
-            return out
-        with root:
-            idx = 0
-            while True:
-                try:
-                    child_name = winreg_mod.EnumKey(root, idx)
-                except OSError:
-                    break
-                idx += 1
-                try:
-                    with winreg_mod.OpenKey(root, child_name) as child:
-                        loc, _ = winreg_mod.QueryValueEx(child, "InstallLocation")
-                except OSError:
-                    continue
-                if isinstance(loc, str) and loc.strip():
-                    out.append(Path(loc.strip()))
         return out
 
     # -- Kiến trúc & cầu nối -------------------------------------------- #
     def check_binary_arch(self, path: Path) -> BinaryArch:
+        """Đọc PE header (IMAGE_FILE_MACHINE) bằng struct — không lib ngoài.
+
+        0x014c=x86(32), 0x8664=x64(64), 0xAA64=arm64.
+        """
         return self._parse_pe_arch(path)
 
     def needs_arch_bridge(self, lib_path: Path) -> bool:
@@ -244,6 +266,15 @@ class WindowsAdapter(PlatformAdapter):
             '      sc.exe create VNeSign binPath= "...\\vn-esign-service.exe" start= auto\n'
             "  • Service chỉ lắng nghe 127.0.0.1."
         )
+
+
+def _query(winreg_mod, key, value_name: str) -> str:  # type: ignore[no-untyped-def]
+    """Đọc một giá trị REG_SZ; trả chuỗi rỗng nếu không có."""
+    try:
+        val, _ = winreg_mod.QueryValueEx(key, value_name)
+    except OSError:
+        return ""
+    return val if isinstance(val, str) else ""
 
 
 try:  # pragma: no cover - chỉ có ý nghĩa trên Windows
