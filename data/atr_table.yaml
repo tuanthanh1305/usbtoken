@@ -1,0 +1,25 @@
+# ============================================================================
+# atr_table.yaml — BẢNG ATR -> GỢI Ý CHIP (chỉ để TỐI ƯU thứ tự dò module).
+# ============================================================================
+# ⚠️ ATR CHỈ để tối ưu: biết ATR -> đoán CHIP -> ưu tiên nạp đúng module thay vì
+#    nạp mù. TUYỆT ĐỐI KHÔNG dùng ATR để kết luận CA — CA chỉ xác định bằng
+#    chain building (PROMPT 9). Đoán sai ATR chỉ làm chậm, không sai pháp lý.
+#
+# Nguồn cập nhật: smartcard_list.txt của Ludovic Rousseau (pcsc-tools):
+#   https://pcsc-tools.apdu.fr/smartcard_list.txt
+# Import bằng:  python -m tools.import_smartcard_list <đường_dẫn_smartcard_list.txt>
+#
+# Schema mỗi entry:
+#   atr        : mẫu ATR (hex, cách nhau khoảng trắng tuỳ ý). Ký tự "." = 1
+#                nibble bất kỳ (theo cú pháp smartcard_list.txt).
+#   description: mô tả chip/thẻ (từ smartcard_list.txt).
+#   verified   : true nếu đã đối chiếu với token THẬT của VN; mặc định false.
+#
+# module_hints KHÔNG lưu ở đây — được suy ở runtime bằng cách khớp `description`
+# với chip_vendor trong vendor_intel.yaml (Track A), nên bảng này luôn nhỏ gọn.
+
+source: "https://pcsc-tools.apdu.fr/smartcard_list.txt"
+imported_at: ""
+# CHƯA import. Chạy tools/import_smartcard_list để nạp dữ liệu THẬT.
+# Để trống -> fingerprint_by_atr luôn trả "unknown" (an toàn: không đoán bừa).
+entries: []

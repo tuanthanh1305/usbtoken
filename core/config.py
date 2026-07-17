@@ -72,6 +72,11 @@ def vendor_intel_path() -> Path:
     return data_dir() / "vendor_intel.yaml"
 
 
+def atr_table_path() -> Path:
+    """Bảng ATR -> gợi ý chip (cập nhật từ smartcard_list.txt của L. Rousseau)."""
+    return data_dir() / "atr_table.yaml"
+
+
 def appendix_i_path() -> Path:
     return compliance_dir() / "appendix_I.yaml"
 
@@ -154,6 +159,7 @@ __all__ = [
     "trust_signing_pub_path",
     "compliance_dir",
     "vendor_intel_path",
+    "atr_table_path",
     "appendix_i_path",
     "appendix_ii_path",
     "load_ca_registry",
