@@ -73,16 +73,25 @@ class ModuleCandidate(_Base):
     )
     source: str = Field(
         default="search_path",
-        description="Nguồn: search_path | system | user_config | vendor_intel.",
+        description="Nguồn: system | user_config | vendor_intel | glob_probe.",
+    )
+    tier: int = Field(
+        default=0, ge=0, le=4, description="Tầng phát hiện (1..4); 0 nếu chưa rõ."
     )
     confidence: float = Field(
         default=0.0, ge=0.0, le=1.0, description="Độ tin cậy phát hiện [0..1]."
     )
+    confidence_label: str = Field(
+        default="", description="Nhãn: confirmed | documented | hypothesis."
+    )
     arch: str = Field(default="unknown", description="Kiến trúc native của file.")
     validated: bool = Field(
-        default=False, description="Đã kiểm tra tồn tại + arch hợp lệ (chưa nạp thử)."
+        default=False,
+        description="Đã xác thực (arch hợp lệ; Tầng 4: C_GetInfo cryptokiVersion hợp lệ).",
     )
-    needs_arch_bridge: bool = Field(default=False, description="Lệch arch với host?")
+    needs_arch_bridge: bool = Field(
+        default=False, description="Lệch arch với host? (ĐÁNH CỜ, KHÔNG loại bỏ)."
+    )
     warnings: list[str] = Field(default_factory=list)
 
 

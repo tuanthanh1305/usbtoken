@@ -35,6 +35,12 @@ def _dispatch(method: str, params: dict[str, Any]) -> Any:
         return {"pong": True, **_env_info()}
     if method == "shutdown":
         return SHUTDOWN
+    if method == "validate":
+        # Xác thực module bằng C_GetInfo — chạy Ở ĐÂY (tiến trình con cô lập) để
+        # module rác/hỏng không làm sập daemon chính.
+        from core.pkcs11_probe import probe_module
+
+        return probe_module(params.get("module_path", ""))
     if method == "enumerate":
         # Chỗ dành sẵn cho giai đoạn đọc token (chưa hiện thực ở prompt này).
         raise NotImplementedError(

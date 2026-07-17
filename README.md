@@ -57,6 +57,21 @@ cộng còn lại là `hypothesis` — **tuyệt đối không hard-code tên fi
 python -m core.intel --list --os linux --track B   # xem bảng vàng đã lọc
 ```
 
+**Phát hiện 4 tầng** (`core/discovery.py`) — triết lý *hỏi hệ điều hành, đừng
+đoán tên file*:
+
+1. **`discover_from_system`** (confirmed) — dpkg/rpm/Registry/apps (chính xác nhất).
+2. **`discover_from_user_config`** (confirmed) — p11-kit, NSS.
+3. **`vendor_intel.yaml`** — Track A/B theo tên file (entry `hypothesis` KHÔNG
+   quét bằng tên, chỉ cấp glob_hints).
+4. **Glob rộng + xác thực `C_GetInfo`** trong **tiến trình con cô lập** (module
+   rác không làm sập daemon) → tự phát hiện module Track B của 25 CA chưa biết
+   tên file; `cryptokiVersion` hợp lệ mới nhận.
+
+Lệch kiến trúc chỉ **đánh cờ** `needs_arch_bridge` (không loại bỏ). Không ra
+module → chẩn đoán theo thứ tự xác suất (lệch arch → chưa cài middleware → PC/SC
+→ udev/plugdev → Rosetta/quarantine → cần login).
+
 ## Quy tắc kiến trúc bất khả xâm phạm
 
 > Mọi `if platform.system() == ...` **CHỈ** nằm trong `core/platform/`.
@@ -125,7 +140,8 @@ python -m venv .venv && source .venv/bin/activate
 pip install -r requirements-dev.txt
 
 python -m core.platform --diagnose   # chẩn đoán OS/arch/module/PC/SC (per-OS)
-python -m tools.diagnose             # (bí danh tương đương)
+python -m core.discovery --scan --verbose   # quét module 4 tầng (Tầng 4: C_GetInfo)
+python -m tools.diagnose             # (bí danh của --diagnose)
 python -m service.main            # daemon http://127.0.0.1:8787
 cd web && npm install && npm run dev   # UI http://localhost:5173
 

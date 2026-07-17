@@ -100,6 +100,11 @@ class BridgeClient:
         """Kiểm tra helper sống + lấy arch/bits/pykcs11 của nó."""
         return self._rpc("ping", {}, timeout)
 
+    def validate_module(self, module_path: str, timeout: float = 15.0) -> dict[str, Any]:
+        """Nhờ helper xác thực module bằng C_GetInfo (trả dict probe_module)."""
+        result = self._rpc("validate", {"module_path": module_path}, timeout)
+        return dict(result) if isinstance(result, dict) else {"ok": False, "error": "kết quả lạ"}
+
     def enumerate_tokens(self, module_path: str, timeout: float = 15.0) -> list[dict[str, Any]]:
         """Nhờ helper liệt kê token của ``module_path`` (giai đoạn sau)."""
         result = self._rpc("enumerate", {"module_path": module_path}, timeout)
