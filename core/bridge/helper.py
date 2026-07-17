@@ -24,6 +24,7 @@ from .protocol import (
     M_ENUMERATE,
     M_GET_INFO,
     M_PING,
+    M_READ_CERTIFICATES,
     M_READ_CERTS,
     M_SHUTDOWN,
     M_SIGN,
@@ -72,6 +73,11 @@ def _dispatch(method: str, params: dict[str, Any]) -> Any:
         return ops.enumerate_tokens(mp)
     if method == M_READ_CERTS:
         return ops.read_certs(mp, int(params["slot_id"]), params.get("pin"))
+    if method == M_READ_CERTIFICATES:
+        return ops.read_certificates(
+            mp, int(params["slot_id"]), params.get("pin"),
+            bool(params.get("protected_auth", False)),
+        )
     if method == M_SIGN:
         return ops.sign(
             mp,

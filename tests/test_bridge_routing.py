@@ -110,7 +110,7 @@ def test_read_certs_identical_and_parsed() -> None:
     a = _inproc().read_certs(slot_id=0, pin="1234")
     b = _bridged().read_certs(slot_id=0, pin="1234")
     assert [c.model_dump() for c in a] == [c.model_dump() for c in b]
-    assert a[0].subject == _leaf.cert.subject.rfc4514_string()  # parse DER ở host
+    assert a[0].subject_raw == _leaf.cert.subject.rfc4514_string()  # parse DER ở host
     assert a[0].key_id_hex == "a1b2"
 
 

@@ -139,32 +139,75 @@ class TokenInfo(_Base):
 
 
 class KeyInfo(_Base):
-    """Một đối tượng khoá trên token."""
+    """Một đối tượng khoá trên token (khớp cert qua CKA_ID — SỢI CHỈ nối)."""
 
+    has_private_key: bool = Field(
+        default=False, description="Có khoá private tương ứng CKA_ID trên token không."
+    )
     label: str = ""
     id_hex: str = ""
     key_type: str = Field(default="", description="RSA | EC | ...")
     key_class: Literal["private", "public", "secret", "unknown"] = "unknown"
-    bits: int | None = None
-    usable_for_signing: bool = False
+    key_size: int | None = Field(default=None, description="Độ dài khoá (bit).")
+    usable_for_signing: bool = Field(default=False, description="Cờ CKA_SIGN.")
+    allowed_mechanisms: list[str] = Field(
+        default_factory=list, description="CKA_ALLOWED_MECHANISMS (nếu token cung cấp)."
+    )
 
 
 # --------------------------------------------------------------------------- #
 # Chứng thư (TRỤC 3)                                                           #
 # --------------------------------------------------------------------------- #
-class CertInfo(_Base):
-    """Chứng thư số X.509 (đọc từ token hoặc kho fallback)."""
+class BasicConstraints(_Base):
+    """Ràng buộc cơ bản của chứng thư (BasicConstraints)."""
 
-    subject: str = ""
-    issuer: str = ""
-    serial_hex: str = ""
+    ca: bool = False
+    path_length: int | None = None
+
+
+class CertInfo(_Base):
+    """Chứng thư số X.509 đã parse (OS-agnostic).
+
+    ⚠️ ĐỊNH DANH VIỆT NAM (``vn_ids``) mang tính KHOAN DUNG: profile Subject DN
+    CHƯA được xác minh nên kết quả trích xuất chỉ là ước lượng (kèm
+    ``profile_confidence``). LUÔN giữ ``subject_raw`` + ``subject_rdns`` nguyên
+    vẹn để audit; KHÔNG coi regex là chuẩn.
+    """
+
+    subject_raw: str = Field(default="", description="Subject DN (RFC4514) — GIỮ NGUYÊN để audit.")
+    issuer_raw: str = Field(default="", description="Issuer DN (RFC4514).")
+    serial_number: str = Field(default="", description="Serial number (hex).")
     not_before: datetime | None = None
     not_after: datetime | None = None
-    fingerprint_sha256: str = Field(default="", description="Vân tay SHA-256 (hex) của DER.")
-    der_b64: str = Field(default="", description="Chứng thư DER mã hoá base64.")
-    key_id_hex: str = ""
+    is_expired: bool = False
+    days_remaining: int | None = None
     key_usage: list[str] = Field(default_factory=list)
     extended_key_usage: list[str] = Field(default_factory=list)
+    basic_constraints: BasicConstraints = Field(default_factory=BasicConstraints)
+    sha1_thumbprint: str = ""
+    sha256_thumbprint: str = ""
+    public_key_algo: str = Field(default="", description="RSA | EC | ...")
+    key_size: int | None = None
+    # ĐẦU VÀO BẮT BUỘC cho chain building + kiểm thu hồi (PROMPT 9):
+    ski: str = Field(default="", description="Subject Key Identifier (hex).")
+    aki: str = Field(default="", description="Authority Key Identifier (hex).")
+    aia_urls: list[str] = Field(default_factory=list, description="caIssuers URLs (AIA).")
+    crl_dp_urls: list[str] = Field(default_factory=list, description="CRL Distribution Points.")
+    ocsp_urls: list[str] = Field(default_factory=list, description="OCSP responder URLs.")
+    # Audit + định danh VN (khoan dung):
+    subject_rdns: list[dict[str, str]] = Field(
+        default_factory=list, description="Mọi RDN thô [{oid, value}] để audit."
+    )
+    vn_ids: dict[str, list[str]] = Field(
+        default_factory=dict, description="Định danh VN ước lượng (rỗng nếu không nhận diện)."
+    )
+    profile_confidence: str = Field(
+        default="unknown", description="unknown | low | medium (KHÔNG bao giờ high khi chưa xác minh)."
+    )
+    warnings: list[str] = Field(default_factory=list)
+    der_b64: str = Field(default="", description="Chứng thư DER mã hoá base64.")
+    key_id_hex: str = Field(default="", description="CKA_ID (hex) — nối tới khoá trên token.")
+    key: KeyInfo | None = Field(default=None, description="Thông tin khoá private khớp CKA_ID.")
 
 
 class CAInfo(_Base):
@@ -277,6 +320,7 @@ __all__ = [
     "PinState",
     "TokenInfo",
     "KeyInfo",
+    "BasicConstraints",
     "CertInfo",
     "CAInfo",
     "RevocationStatus",

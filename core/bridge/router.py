@@ -143,25 +143,14 @@ class ModuleSession:
 
     @staticmethod
     def _to_cert(d: dict[str, Any]) -> CertInfo:
-        """Parse DER -> CertInfo (parse ở HOST bằng cryptography)."""
-        der_b64 = str(d.get("der_b64", ""))
-        info = CertInfo(der_b64=der_b64, key_id_hex=str(d.get("id_hex", "")))
-        if not der_b64:
-            return info
-        try:
-            from cryptography import x509
-            from cryptography.hazmat.primitives import hashes
+        """Parse DER -> CertInfo ở HOST (dùng x509_parser DUY NHẤT)."""
+        from core import x509_parser
 
-            der = base64.b64decode(der_b64)
-            cert = x509.load_der_x509_certificate(der)
-            info.subject = cert.subject.rfc4514_string()
-            info.issuer = cert.issuer.rfc4514_string()
-            info.serial_hex = format(cert.serial_number, "x")
-            info.not_before = cert.not_valid_before_utc
-            info.not_after = cert.not_valid_after_utc
-            info.fingerprint_sha256 = cert.fingerprint(hashes.SHA256()).hex()
-        except Exception:  # noqa: BLE001 - DER hỏng vẫn giữ được der_b64 thô
-            pass
+        der_b64 = str(d.get("der_b64", ""))
+        if not der_b64:
+            return CertInfo(der_b64=der_b64, key_id_hex=str(d.get("id_hex", "")))
+        info = x509_parser.parse(base64.b64decode(der_b64))
+        info.key_id_hex = str(d.get("id_hex", ""))
         return info
 
 
