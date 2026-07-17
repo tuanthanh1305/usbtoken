@@ -72,6 +72,14 @@ Lệch kiến trúc chỉ **đánh cờ** `needs_arch_bridge` (không loại b�
 module → chẩn đoán theo thứ tự xác suất (lệch arch → chưa cài middleware → PC/SC
 → udev/plugdev → Rosetta/quarantine → cần login).
 
+**Arch bridge dùng chung** (`core/bridge/`) — khi module lệch kiến trúc, spawn
+helper cùng arch (Win python/exe 32-bit · mac `arch -x86_64` Rosetta · Linux
+Python 32-bit i386 multilib) và giao tiếp JSON-RPC (`get_info`/`enumerate_tokens`/
+`read_certs`/`sign`; PIN là trường **nhạy cảm — loại khỏi mọi log**). `BridgeManager`
+lo spawn lười, tự restart, timeout, kill sạch, remediation đúng OS. Tầng trên gọi
+**thống nhất** qua `ModuleSession`: in-process (cùng arch) hay bridge (lệch arch)
+đều trả `TokenInfo`/`CertInfo` **y hệt** (cùng chạy `core/pkcs11_ops`).
+
 ## Quy tắc kiến trúc bất khả xâm phạm
 
 > Mọi `if platform.system() == ...` **CHỈ** nằm trong `core/platform/`.

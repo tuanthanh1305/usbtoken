@@ -221,10 +221,12 @@ class LinuxAdapter(PlatformAdapter):
 
     def arch_bridge_hint(self) -> str:
         return (
-            ".so lệch arch/bitness với host (vd. FPT ELF32 trên host 64-bit).\n"
-            "  • Cài emulator: qemu-user (qemu-x86_64) hoặc box64.\n"
-            "  • Đặt VN_ESIGN_BRIDGE_PYTHON (Python đúng-arch) và "
-            "VN_ESIGN_BRIDGE_LAUNCHER (emulator)."
+            ".so lệch arch/bitness với host.\n"
+            "  • ELF32 x86 trên host x86_64 (vd. FPT fptca_v4.so): cài multilib i386:\n"
+            "      sudo dpkg --add-architecture i386 && sudo apt install libc6:i386\n"
+            "    rồi đặt VN_ESIGN_BRIDGE_PYTHON trỏ tới Python 32-bit.\n"
+            "  • Khác họ CPU (x86_64 <-> arm64): cài emulator qemu-user (qemu-x86_64) "
+            "hoặc box64, đặt VN_ESIGN_BRIDGE_PYTHON + VN_ESIGN_BRIDGE_LAUNCHER."
         )
 
     # -- Chẩn đoán ------------------------------------------------------ #

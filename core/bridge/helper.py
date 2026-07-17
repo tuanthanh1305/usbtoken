@@ -1,11 +1,14 @@
-"""Phía SERVER của bridge — chạy trong tiến trình helper CÙNG ARCH với module.
+"""Phía HELPER (tiến trình con) — chạy được 3 chế độ từ CÙNG một file code.
 
-Chạy: ``python -m core.bridge.helper`` (hoặc .exe 32-bit trên Windows, hoặc
-``arch -x86_64 <python> -m core.bridge.helper`` dưới Rosetta trên macOS).
+    Windows : đóng gói .exe 32-bit (PyInstaller + Python 32-bit).
+    macOS   : ``arch -x86_64 <python_x86_64> -m core.bridge.helper`` (Rosetta 2).
+    Linux   : Python 32-bit (nếu có multilib i386) — chạy module .so 32-bit.
 
-Ở giai đoạn scaffolding này CHƯA có logic đọc token — helper mới hỗ trợ
-``ping`` (báo cáo arch/bits để host kiểm chứng cầu nối). Method ``enumerate``
-là chỗ dành sẵn cho giai đoạn đọc token (PROMPT sau), hiện trả lỗi rõ ràng.
+Helper nạp module PKCS#11 (đúng arch của nó) và thực thi thao tác qua
+``core.pkcs11_ops`` — CÙNG mã với tuyến in-process, nên kết quả GIỐNG HỆT.
+
+Mọi ngoại lệ được gói thành phản hồi lỗi (không làm sập helper). ⚠️ Thông báo
+lỗi/log KHÔNG chứa PIN (ops không đưa pin ra ngoài).
 """
 
 from __future__ import annotations
@@ -16,11 +19,24 @@ import platform
 import sys
 from typing import Any, TextIO
 
-from .protocol import SHUTDOWN, decode, encode, make_error, make_result
+from .protocol import (
+    M_CLOSE,
+    M_ENUMERATE,
+    M_GET_INFO,
+    M_PING,
+    M_READ_CERTS,
+    M_SHUTDOWN,
+    M_SIGN,
+    M_VALIDATE,
+    SHUTDOWN,
+    decode,
+    encode,
+    make_error,
+    make_result,
+)
 
 
 def _env_info() -> dict[str, Any]:
-    """Thông tin môi trường helper để host kiểm chứng đúng arch."""
     return {
         "machine": platform.machine(),
         "bits": 64 if sys.maxsize > 2**32 else 32,
@@ -30,31 +46,46 @@ def _env_info() -> dict[str, Any]:
 
 
 def _dispatch(method: str, params: dict[str, Any]) -> Any:
-    """Định tuyến một lời gọi RPC."""
-    if method == "ping":
+    """Định tuyến một lời gọi RPC tới ``core.pkcs11_ops``."""
+    if method == M_PING:
         return {"pong": True, **_env_info()}
-    if method == "shutdown":
+    if method == M_SHUTDOWN:
         return SHUTDOWN
-    if method == "validate":
-        # Xác thực module bằng C_GetInfo — chạy Ở ĐÂY (tiến trình con cô lập) để
-        # module rác/hỏng không làm sập daemon chính.
+    if method == M_CLOSE:
+        # Phiên module không giữ trạng thái lâu dài -> đóng là no-op an toàn.
+        return {"closed": True}
+
+    # Các thao tác nạp module -> import lười ops (CÙNG mã với in-process).
+    from core import pkcs11_ops as ops
+
+    # Trả THẲNG kết quả của ops (không bọc thêm) để shape GIỐNG HỆT tuyến
+    # in-process — tầng router map sang model như nhau bất kể tuyến.
+    mp = params.get("module_path", "")
+    if method == M_VALIDATE:
+        # Tầng 4 discovery: probe_module trả kèm token_slots (tối ưu p11-kit).
         from core.pkcs11_probe import probe_module
 
-        return probe_module(params.get("module_path", ""))
-    if method == "enumerate":
-        # Chỗ dành sẵn cho giai đoạn đọc token (chưa hiện thực ở prompt này).
-        raise NotImplementedError(
-            "enumerate: logic đọc token sẽ được hiện thực ở giai đoạn sau."
+        return probe_module(mp)
+    if method == M_GET_INFO:
+        return ops.get_info(mp)
+    if method == M_ENUMERATE:
+        return ops.enumerate_tokens(mp)
+    if method == M_READ_CERTS:
+        return ops.read_certs(mp, int(params["slot_id"]), params.get("pin"))
+    if method == M_SIGN:
+        return ops.sign(
+            mp,
+            int(params["slot_id"]),
+            str(params.get("key_id", "")),
+            str(params["mechanism"]),
+            str(params["data_b64"]),
+            params.get("pin"),
         )
     raise ValueError(f"Phương thức RPC không hỗ trợ: {method!r}")
 
 
 def serve(stdin: TextIO | None = None, stdout: TextIO | None = None) -> None:
-    """Vòng lặp server: đọc request JSON từ stdin, ghi response ra stdout.
-
-    Mọi ngoại lệ được gói thành response lỗi (không làm sập helper giữa chừng).
-    Kết thúc khi EOF hoặc nhận method ``shutdown``.
-    """
+    """Vòng lặp server: đọc request JSON (stdin) -> ghi response (stdout)."""
     inp = stdin or sys.stdin
     out = stdout or sys.stdout
     for line in inp:
@@ -71,7 +102,7 @@ def serve(stdin: TextIO | None = None, stdout: TextIO | None = None) -> None:
                 out.flush()
                 return
             out.write(encode(make_result(rid, result)))
-        except Exception as exc:  # noqa: BLE001 - gói lỗi, không sập helper
+        except Exception as exc:  # noqa: BLE001 - gói lỗi, KHÔNG kèm pin
             out.write(encode(make_error(rid, "helper_error", str(exc))))
         out.flush()
 

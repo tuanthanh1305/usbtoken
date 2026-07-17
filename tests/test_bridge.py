@@ -24,11 +24,21 @@ def test_ping_roundtrip() -> None:
         c.close()
 
 
-def test_enumerate_not_implemented_yet() -> None:
+def test_enumerate_bad_module_errors() -> None:
     c = _client()
     try:
-        with pytest.raises(BridgeError):  # enumerate chưa hiện thực -> lỗi RPC
-            c.enumerate_tokens("/any/module.so", timeout=10)
+        # Module không nạp được -> lỗi lan qua RPC (helper KHÔNG sập).
+        with pytest.raises(BridgeError):
+            c.enumerate_tokens("/khong/ton/tai/module.so", timeout=10)
+    finally:
+        c.close()
+
+
+def test_get_info_bad_module_returns_error_dict() -> None:
+    c = _client()
+    try:
+        info = c.get_info("/khong/ton/tai/module.so", timeout=10)
+        assert info["ok"] is False and info["error"]  # get_info không ném, trả dict
     finally:
         c.close()
 

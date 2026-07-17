@@ -12,7 +12,18 @@ import threading
 import time
 from typing import Any
 
-from .protocol import decode, encode, make_request
+from .protocol import (
+    M_ENUMERATE,
+    M_GET_INFO,
+    M_PING,
+    M_READ_CERTS,
+    M_SHUTDOWN,
+    M_SIGN,
+    M_VALIDATE,
+    decode,
+    encode,
+    make_request,
+)
 
 
 class BridgeError(RuntimeError):
@@ -96,19 +107,54 @@ class BridgeClient:
                 raise BridgeError(str(msg["error"].get("message", "lỗi helper")))
             return msg.get("result")
 
+    def rpc(self, method: str, params: dict[str, Any] | None = None, timeout: float = 15.0) -> Any:
+        """Gọi RPC tổng quát (dùng bởi BridgeManager)."""
+        return self._rpc(method, params, timeout)
+
     def ping(self, timeout: float = 5.0) -> dict[str, Any]:
         """Kiểm tra helper sống + lấy arch/bits/pykcs11 của nó."""
-        return self._rpc("ping", {}, timeout)
+        return self._rpc(M_PING, {}, timeout)
 
     def validate_module(self, module_path: str, timeout: float = 15.0) -> dict[str, Any]:
-        """Nhờ helper xác thực module bằng C_GetInfo (trả dict probe_module)."""
-        result = self._rpc("validate", {"module_path": module_path}, timeout)
+        """Xác thực module bằng C_GetInfo (trả dict như core.pkcs11_ops.get_info)."""
+        result = self._rpc(M_VALIDATE, {"module_path": module_path}, timeout)
+        return dict(result) if isinstance(result, dict) else {"ok": False, "error": "kết quả lạ"}
+
+    def get_info(self, module_path: str, timeout: float = 15.0) -> dict[str, Any]:
+        result = self._rpc(M_GET_INFO, {"module_path": module_path}, timeout)
         return dict(result) if isinstance(result, dict) else {"ok": False, "error": "kết quả lạ"}
 
     def enumerate_tokens(self, module_path: str, timeout: float = 15.0) -> list[dict[str, Any]]:
-        """Nhờ helper liệt kê token của ``module_path`` (giai đoạn sau)."""
-        result = self._rpc("enumerate", {"module_path": module_path}, timeout)
-        return list(result.get("tokens", []))
+        result = self._rpc(M_ENUMERATE, {"module_path": module_path}, timeout)
+        return list(result) if isinstance(result, list) else []
+
+    def read_certs(
+        self, module_path: str, slot_id: int, pin: str | None = None, timeout: float = 20.0
+    ) -> list[dict[str, Any]]:
+        params: dict[str, Any] = {"module_path": module_path, "slot_id": slot_id}
+        if pin is not None:
+            params["pin"] = pin  # ⚠️ nhạy cảm — không log ở bất kỳ đâu
+        result = self._rpc(M_READ_CERTS, params, timeout)
+        return list(result) if isinstance(result, list) else []
+
+    def sign(
+        self,
+        module_path: str,
+        slot_id: int,
+        key_id: str,
+        mechanism: str,
+        data_b64: str,
+        pin: str | None = None,
+        timeout: float = 20.0,
+    ) -> dict[str, Any]:
+        params: dict[str, Any] = {
+            "module_path": module_path, "slot_id": slot_id, "key_id": key_id,
+            "mechanism": mechanism, "data_b64": data_b64,
+        }
+        if pin is not None:
+            params["pin"] = pin  # ⚠️ nhạy cảm
+        result = self._rpc(M_SIGN, params, timeout)
+        return dict(result) if isinstance(result, dict) else {}
 
     def close(self) -> None:
         """Đóng helper: gửi shutdown, đóng ống, terminate rồi kill nếu cần."""
@@ -116,7 +162,7 @@ class BridgeClient:
             return
         self._closed = True
         try:
-            self._rpc("shutdown", {}, timeout=2.0)
+            self._rpc(M_SHUTDOWN, {}, timeout=2.0)
         except BridgeError:
             pass
         for closer in (self._close_stdin, self._terminate, self._kill):
