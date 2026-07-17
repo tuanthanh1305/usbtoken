@@ -31,6 +31,7 @@ M_GET_INFO = "get_info"
 M_ENUMERATE = "enumerate_tokens"
 M_READ_CERTS = "read_certs"
 M_READ_CERTIFICATES = "read_certificates"  # bản đầy đủ (kèm key matching)
+M_GET_MECHANISMS = "get_mechanisms"  # C_GetMechanismList
 M_SIGN = "sign"
 M_CLOSE = "close"
 M_SHUTDOWN = "shutdown"
@@ -89,7 +90,7 @@ __all__ = [
     "SHUTDOWN",
     "SENSITIVE_FIELDS",
     "M_PING", "M_GET_INFO", "M_ENUMERATE", "M_READ_CERTS", "M_READ_CERTIFICATES",
-    "M_SIGN", "M_CLOSE", "M_SHUTDOWN", "M_VALIDATE",
+    "M_GET_MECHANISMS", "M_SIGN", "M_CLOSE", "M_SHUTDOWN", "M_VALIDATE",
     "b64encode", "b64decode",
     "encode", "decode", "make_request", "make_result", "make_error",
     "redact_params_for_log",

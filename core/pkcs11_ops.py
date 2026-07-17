@@ -264,6 +264,48 @@ def _match_key(pk: Any, session: Any, cka_id: Any) -> dict[str, Any]:
 
 
 # --------------------------------------------------------------------------- #
+# get_mechanisms — C_GetMechanismList (chọn cơ chế token THỰC SỰ hỗ trợ)        #
+# --------------------------------------------------------------------------- #
+def _mech_name(pk: Any, value: Any) -> str:
+    """Chuẩn hoá cơ chế -> tên KHÔNG tiền tố CKM_ (vd. 'SHA256_RSA_PKCS').
+
+    PyKCS11 tuỳ phiên bản trả ``getMechanismList`` là TÊN (chuỗi 'CKM_...') hoặc
+    MÃ SỐ. Xử lý cả hai.
+    """
+    if isinstance(value, str):
+        return value.removeprefix("CKM_")
+    ckm = getattr(pk, "CKM", None)
+    try:
+        name = ckm[value] if ckm is not None else None  # PyKCS11.CKM tra ngược số->tên
+    except Exception:  # noqa: BLE001
+        name = None
+    if isinstance(name, str):
+        return name.removeprefix("CKM_")
+    try:
+        return f"UNKNOWN_{int(value):08X}"
+    except Exception:  # noqa: BLE001
+        return str(value)
+
+
+def get_mechanisms(module_path: str, slot_id: int) -> list[str]:
+    """Liệt kê cơ chế token hỗ trợ (tên KHÔNG tiền tố CKM_). Không cần PIN."""
+    pk = _pykcs11()
+    lib = pk.PyKCS11Lib()
+    _PKCS11_LOCK.acquire()
+    try:
+        lib.load(module_path)
+        names: list[str] = []
+        for m in lib.getMechanismList(slot_id):
+            name = _mech_name(pk, m)
+            if name not in names:
+                names.append(name)
+        return names
+    finally:
+        _finalize(lib)
+        _PKCS11_LOCK.release()
+
+
+# --------------------------------------------------------------------------- #
 # sign — C_SignInit + C_Sign (login bằng PIN)                                   #
 # --------------------------------------------------------------------------- #
 def sign(
@@ -333,6 +375,7 @@ __all__ = [
     "enumerate_tokens",
     "read_certs",
     "read_certificates",
+    "get_mechanisms",
     "sign",
     "PyKCS11Unavailable",
 ]

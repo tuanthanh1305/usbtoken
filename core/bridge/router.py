@@ -26,6 +26,7 @@ from .manager import BridgeManager
 from .protocol import (
     M_ENUMERATE,
     M_GET_INFO,
+    M_GET_MECHANISMS,
     M_READ_CERTS,
     M_SIGN,
 )
@@ -94,6 +95,11 @@ class ModuleSession:
             params["pin"] = pin  # ⚠️ nhạy cảm
         raw = self._call(M_READ_CERTS, params)
         return [self._to_cert(d) for d in (raw or [])]
+
+    def get_mechanisms(self, slot_id: int) -> list[str]:
+        """Cơ chế token hỗ trợ (tên KHÔNG tiền tố CKM_) — cùng shape mọi tuyến."""
+        raw = self._call(M_GET_MECHANISMS, {"slot_id": slot_id})
+        return [str(m) for m in (raw or [])]
 
     def sign(
         self, slot_id: int, key_id: str, mechanism: str, data: bytes, pin: str | None = None

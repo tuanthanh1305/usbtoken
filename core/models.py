@@ -331,6 +331,26 @@ class TokenBundle(_Base):
     certificates: list[CertRecord] = Field(default_factory=list)
 
 
+class SignResult(_Base):
+    """Kết quả KÝ SỐ — thông điệp đã ký + bằng chứng pháp lý (Điều 5 TT 15/2025).
+
+    ``validation`` là kết quả ``assert_signable`` chạy TRƯỚC khi ký (bắt buộc).
+    ``signed_document_b64`` đã gắn chữ ký + chứng thư + thời điểm ký (toàn vẹn).
+    KHÔNG chứa PIN hay private key.
+    """
+
+    signed_document_b64: str = Field(..., description="Thông điệp đã ký (base64).")
+    format: str = Field(..., description="cms | pades | xades.")
+    mechanism: str = Field(default="", description="Cơ chế PKCS#11 đã dùng (token hỗ trợ ∩ Phụ lục I).")
+    signature_algorithm: str = Field(default="", description="Định danh thuật toán chữ ký (Phụ lục I).")
+    validation: ValidationResult
+    signing_time: datetime
+    timestamped: bool = Field(default=False, description="Đã gắn dấu thời gian TSA chưa.")
+    tsa_url: str = ""
+    evidence_id: str = Field(default="", description="Mã bằng chứng đã lưu (đối chiếu audit).")
+    reasons_vi: list[str] = Field(default_factory=list)
+
+
 class AggregateResult(_Base):
     """Kết quả gộp TẤT CẢ nguồn (PKCS11/BRIDGE/P11KIT/PACKAGE + fallback OS).
 
@@ -359,6 +379,9 @@ class ErrorCode(str, Enum):
     TOKEN_NOT_PRESENT = "token_not_present"
     LOGIN_REQUIRED = "login_required"
     VALIDATION_FAILED = "validation_failed"
+    SIGN_FAILED = "sign_failed"
+    SIGN_FORMAT_UNAVAILABLE = "sign_format_unavailable"
+    MECHANISM_UNAVAILABLE = "mechanism_unavailable"
     TRUST_STORE_EMPTY = "trust_store_empty"
     CHAIN_BUILD_FAILED = "chain_build_failed"
     POLICY_NOT_CONFIGURED = "policy_not_configured"
@@ -393,6 +416,7 @@ __all__ = [
     "ValidationResult",
     "CertRecord",
     "TokenBundle",
+    "SignResult",
     "AggregateResult",
     "ErrorCode",
     "ErrorInfo",

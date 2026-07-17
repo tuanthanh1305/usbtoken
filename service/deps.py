@@ -36,6 +36,7 @@ class ServiceDeps:
     aggregate_fn: AggregateFn
     enumerate_fn: EnumerateFn
     read_fn: ReadFn
+    signer_factory: Callable[[], Any]  # () -> core.signer.Signer
     events_source_factory: EventsSourceFactory
     allowed_hosts: frozenset[str] = DEFAULT_ALLOWED_HOSTS
     allowed_origins: tuple[str, ...] = DEFAULT_ALLOWED_ORIGINS
@@ -66,6 +67,7 @@ def build_default_deps(adapter: PlatformAdapter | None = None) -> ServiceDeps:
     from core.cert_reader import read_certificates
     from core.pcsc_probe import PCSCProbe
     from core.pkcs11_engine import enumerate_tokens
+    from core.signer import Signer
     from core.trust.validator import CertificateValidator
 
     ad = adapter or get_adapter()
@@ -85,6 +87,7 @@ def build_default_deps(adapter: PlatformAdapter | None = None) -> ServiceDeps:
         aggregate_fn=aggregate,
         enumerate_fn=enumerate_,
         read_fn=read_certificates,
+        signer_factory=lambda: Signer(adapter=ad),
         events_source_factory=lambda: PcscEventsSource(PCSCProbe(ad)),
     )
 

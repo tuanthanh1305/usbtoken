@@ -16,6 +16,7 @@ from fastapi.testclient import TestClient
 
 from core.aggregator import SOURCE_PKCS11
 from core.cert_reader import CertReadResult
+from core.errors import SigningNotAllowedError
 from core.models import (
     AggregateResult,
     CAInfo,
@@ -23,6 +24,7 @@ from core.models import (
     ErrorCode,
     ErrorInfo,
     KeyInfo,
+    SignResult,
     TokenBundle,
     TokenInfo,
     TrustPathNode,
@@ -79,6 +81,29 @@ class FakeEvents:
         return self._batches.pop(0) if self._batches else []
 
 
+class _FakeSigner:
+    """Signer giả: trả SignResult định trước, hoặc ném lỗi (mô phỏng từ chối)."""
+
+    def __init__(self, *, result=None, raises=None):  # type: ignore[no-untyped-def]
+        self._result = result
+        self._raises = raises
+        self.calls = 0
+
+    def sign(self, **kwargs):  # type: ignore[no-untyped-def]
+        self.calls += 1
+        if self._raises is not None:
+            raise self._raises
+        now = datetime.now(timezone.utc)
+        return self._result or SignResult(
+            signed_document_b64=base64.b64encode(b"signed-cms").decode(),
+            format=str(kwargs.get("fmt", "cms")), mechanism="SHA256_RSA_PKCS",
+            signature_algorithm="RSASSA-PKCS1-v1_5-SHA256",
+            validation=ValidationResult(status=ValidationStatusCode.VALID, checked_at=now, at_time=now),
+            signing_time=now, evidence_id="ev12345678",
+            reasons_vi=["Đã ký CMS."],
+        )
+
+
 def _token(slot=1, module="/usr/lib/libtoken.so", serial="SN1"):  # type: ignore[no-untyped-def]
     return TokenInfo(module_path=module, slot_id=slot, serial=serial)
 
@@ -115,6 +140,7 @@ def _deps(**over):  # type: ignore[no-untyped-def]
         aggregate_fn=aggregate,
         enumerate_fn=enumerate_,
         read_fn=read_fn,
+        signer_factory=lambda: over.get("signer", _FakeSigner()),
         events_source_factory=lambda: over.get("events", FakeEvents([], [])),
         event_poll_interval=0.01,
     )
@@ -377,3 +403,95 @@ def test_ws_events_rejects_bad_origin() -> None:
             "/events", headers={"host": "127.0.0.1:8787", "Origin": "http://evil.com"}
         ) as ws:
             ws.receive_json()
+
+
+# --------------------------------------------------------------------------- #
+# POST /sign — CHỈ khi phiên hợp lệ; Điều 5 gate                                #
+# --------------------------------------------------------------------------- #
+def _signing_token_and_cert():  # type: ignore[no-untyped-def]
+    _, _, leaf = make_chain()
+    tok = _token()
+    ci = _certinfo(leaf, with_key=True)
+    ci.key.id_hex = "abcd"
+    ci.key_id_hex = "abcd"
+    return tok, leaf, ci
+
+
+def test_sign_requires_valid_session() -> None:
+    tok, _, ci = _signing_token_and_cert()
+
+    def read_fn(token, pin_callback=None):  # type: ignore[no-untyped-def]
+        return CertReadResult(certificates=[ci])
+
+    c = _client(_deps(tokens=[tok], read_fn=read_fn))
+    r = c.post("/sign", json={
+        "token_id": token_public_id(tok), "key_id": "abcd", "format": "cms",
+        "payload_base64": base64.b64encode(b"doc").decode(), "session_id": "bogus",
+    })
+    assert r.status_code == 401  # không có phiên login hợp lệ -> KHÔNG ký
+
+
+def test_sign_success_returns_signed_doc_and_evidence() -> None:
+    tok, _, ci = _signing_token_and_cert()
+    tid = token_public_id(tok)
+    sessions = SessionStore()
+    session = sessions.login(tid, "111111")
+
+    def read_fn(token, pin_callback=None):  # type: ignore[no-untyped-def]
+        return CertReadResult(certificates=[ci])
+
+    signer = _FakeSigner()
+    c = _client(_deps(tokens=[tok], read_fn=read_fn, sessions=sessions, signer=signer))
+    r = c.post("/sign", json={
+        "token_id": tid, "key_id": "abcd", "format": "cms",
+        "payload_base64": base64.b64encode(b"doc").decode(), "session_id": session.id,
+    })
+    assert r.status_code == 200
+    body = r.json()
+    assert body["signed_document_base64"] and body["evidence_id"] == "ev12345678"
+    assert body["validation_result"]["status"] == "valid"
+    assert signer.calls == 1
+
+
+def test_sign_refused_when_cert_invalid() -> None:
+    tok, _, ci = _signing_token_and_cert()
+    tid = token_public_id(tok)
+    sessions = SessionStore()
+    session = sessions.login(tid, "111111")
+    now = datetime.now(timezone.utc)
+    refusal = SigningNotAllowedError(
+        "Không được phép ký: chứng thư EXPIRED.",
+        detail="expired",
+        result=ValidationResult(status=ValidationStatusCode.EXPIRED, checked_at=now, at_time=now,
+                                reasons_vi=["Chứng thư đã HẾT HẠN."]),
+    )
+
+    def read_fn(token, pin_callback=None):  # type: ignore[no-untyped-def]
+        return CertReadResult(certificates=[ci])
+
+    c = _client(_deps(tokens=[tok], read_fn=read_fn, sessions=sessions,
+                      signer=_FakeSigner(raises=refusal)))
+    r = c.post("/sign", json={
+        "token_id": tid, "key_id": "abcd", "format": "cms",
+        "payload_base64": base64.b64encode(b"doc").decode(), "session_id": session.id,
+    })
+    assert r.status_code == 422  # TỪ CHỐI KÝ
+    detail = r.json()["detail"]
+    assert detail["validation_result"]["status"] == "expired"
+
+
+def test_sign_404_when_key_not_on_token() -> None:
+    tok = _token()
+    tid = token_public_id(tok)
+    sessions = SessionStore()
+    session = sessions.login(tid, "111111")
+
+    def read_fn(token, pin_callback=None):  # type: ignore[no-untyped-def]
+        return CertReadResult(certificates=[])  # không có cert khớp key_id
+
+    c = _client(_deps(tokens=[tok], read_fn=read_fn, sessions=sessions))
+    r = c.post("/sign", json={
+        "token_id": tid, "key_id": "nope", "format": "cms",
+        "payload_base64": base64.b64encode(b"doc").decode(), "session_id": session.id,
+    })
+    assert r.status_code == 404

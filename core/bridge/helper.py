@@ -23,6 +23,7 @@ from .protocol import (
     M_CLOSE,
     M_ENUMERATE,
     M_GET_INFO,
+    M_GET_MECHANISMS,
     M_PING,
     M_READ_CERTIFICATES,
     M_READ_CERTS,
@@ -78,6 +79,8 @@ def _dispatch(method: str, params: dict[str, Any]) -> Any:
             mp, int(params["slot_id"]), params.get("pin"),
             bool(params.get("protected_auth", False)),
         )
+    if method == M_GET_MECHANISMS:
+        return ops.get_mechanisms(mp, int(params["slot_id"]))
     if method == M_SIGN:
         return ops.sign(
             mp,

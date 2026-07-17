@@ -88,6 +88,24 @@ class CompliancePolicy:
         value = self._app_i.get("min_key_sizes") or {}
         return {str(k): int(v) for k, v in value.items()} if isinstance(value, dict) else {}
 
+    def hash_algorithms(self) -> list[str]:
+        """Hàm băm hợp lệ (Phụ lục I)."""
+        self.require_configured()
+        value = self._app_i.get("hash_algorithms") or []
+        return [str(v) for v in value] if isinstance(value, list) else []
+
+    def signature_formats(self) -> list[str]:
+        """Định dạng chữ ký hợp lệ (Phụ lục I): CAdES | PAdES | XAdES."""
+        self.require_configured()
+        value = self._app_i.get("signature_formats") or []
+        return [str(v) for v in value] if isinstance(value, list) else []
+
+    def timestamp_policy(self) -> dict[str, Any]:
+        """Chính sách dấu thời gian (Phụ lục I): {required_when, tsa_profile}."""
+        self.require_configured()
+        value = self._app_i.get("timestamp") or {}
+        return dict(value) if isinstance(value, dict) else {}
+
     def certificate_requirements(self) -> dict[str, Any]:
         """Yêu cầu hợp lệ chứng thư (Phụ lục II)."""
         self.require_configured()

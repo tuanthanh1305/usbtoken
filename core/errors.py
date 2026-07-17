@@ -67,6 +67,24 @@ class PolicyNotConfiguredError(VNeSignError):
     code = ErrorCode.POLICY_NOT_CONFIGURED
 
 
+class SignerError(VNeSignError):
+    """Lỗi trong quá trình ký (gốc)."""
+
+    code = ErrorCode.SIGN_FAILED
+
+
+class MechanismUnavailableError(SignerError):
+    """Không có cơ chế ký nào token hỗ trợ VÀ được Phụ lục I cho phép."""
+
+    code = ErrorCode.MECHANISM_UNAVAILABLE
+
+
+class SigningFormatUnavailableError(SignerError):
+    """Định dạng ký (PAdES/XAdES) chưa khả dụng (thiếu thư viện/cấu hình profile)."""
+
+    code = ErrorCode.SIGN_FORMAT_UNAVAILABLE
+
+
 class ESignGatewayError(VNeSignError):
     code = ErrorCode.ESIGN_GATEWAY_ERROR
 
@@ -82,5 +100,8 @@ __all__ = [
     "ChainBuildError",
     "SigningNotAllowedError",
     "PolicyNotConfiguredError",
+    "SignerError",
+    "MechanismUnavailableError",
+    "SigningFormatUnavailableError",
     "ESignGatewayError",
 ]

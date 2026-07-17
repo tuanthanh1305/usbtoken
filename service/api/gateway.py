@@ -31,6 +31,12 @@ from core.models import (
     ValidationResult,
     ValidationStatusCode,
 )
+from core.errors import (
+    MechanismUnavailableError,
+    SignerError,
+    SigningFormatUnavailableError,
+    SigningNotAllowedError,
+)
 from core.signature_verify import verify_detached
 from service.runtime import LOGGER_NAME
 from service.security import connection_allowed
@@ -328,6 +334,95 @@ def result_subject_thumb(der: bytes) -> str:
     import hashlib
 
     return hashlib.sha256(der).hexdigest()  # CHỈ thumbprint vào log, không bao giờ DER đầy đủ
+
+
+# --------------------------------------------------------------------------- #
+# POST /sign  (CHỈ khi phiên login hợp lệ; Điều 5: validate TRƯỚC khi ký)        #
+# --------------------------------------------------------------------------- #
+class SignBody(BaseModel):
+    token_id: str
+    key_id: str = Field(..., description="CKA_ID (hex) của khoá private cần ký.")
+    format: str = Field(default="cms", description="cms | pades | xades.")
+    payload_base64: str = Field(..., description="Thông điệp cần ký (base64).")
+    session_id: str = Field(..., description="Phiên đăng nhập hợp lệ (bắt buộc để ký).")
+    tsa_url: str | None = Field(default=None, description="URL TSA (tuỳ chọn/bắt buộc theo luật).")
+
+
+def _find_signing_cert(certs: list[CertInfo], key_id: str) -> CertInfo | None:
+    """Chọn chứng thư có khoá private khớp ``key_id`` (CKA_ID hex)."""
+    kid = key_id.lower()
+    for ci in certs:
+        has_key = bool(ci.key and ci.key.has_private_key)
+        cand_ids = {ci.key_id_hex.lower(), (ci.key.id_hex.lower() if ci.key else "")}
+        if has_key and kid in cand_ids:
+            return ci
+    return None
+
+
+@router.post("/sign", summary="Ký số thông điệp (Điều 5: kiểm hiệu lực TRƯỚC khi ký)")
+def sign(body: SignBody, request: Request) -> dict[str, object]:
+    deps = request.app.state.deps
+
+    # 1) CHỈ ký khi phiên login hợp lệ cho đúng token.
+    session = deps.sessions.get(body.session_id)
+    if session is None or session.token_id != body.token_id:
+        raise HTTPException(status_code=401, detail="Phiên đăng nhập không hợp lệ hoặc đã hết hạn.")
+
+    token = _find_token(deps, body.token_id)
+    if token is None:
+        raise HTTPException(status_code=404, detail="Không tìm thấy token với id đã cho.")
+
+    try:
+        payload = base64.b64decode(body.payload_base64)
+    except (ValueError, TypeError):
+        raise HTTPException(status_code=400, detail="payload_base64 không phải base64 hợp lệ.")
+
+    # 2) Lấy chứng thư người ký từ token (đăng nhập bằng PIN của phiên).
+    read_result = deps.read_fn(token, session.pin_bytes)
+    signer_cert = _find_signing_cert(list(getattr(read_result, "certificates", []) or []), body.key_id)
+    if signer_cert is None or not signer_cert.der_b64:
+        raise HTTPException(
+            status_code=404,
+            detail="Không tìm thấy chứng thư có khoá private khớp key_id trên token.",
+        )
+    cert_der = base64.b64decode(signer_cert.der_b64)
+    pin_str = session.pin_bytes().decode("utf-8", "ignore")  # PIN đi MỘT CHIỀU vào token
+
+    # 3) Ký — Signer.sign gọi assert_signable TRƯỚC (Điều 5). status != VALID -> từ chối.
+    signer = deps.signer_factory()
+    try:
+        result = signer.sign(
+            token=token, key_id=body.key_id, cert_der=cert_der, payload=payload,
+            fmt=body.format, pin=pin_str, tsa_url=body.tsa_url,
+        )
+    except SigningNotAllowedError as exc:
+        _log.info("sign REFUSED token=%s: %s", body.token_id, getattr(exc, "detail", ""))
+        vr = exc.result.model_dump(mode="json") if getattr(exc, "result", None) is not None else None
+        raise HTTPException(status_code=422, detail={
+            "message_vi": exc.message,
+            "reason": "Chứng thư KHÔNG hợp lệ — TỪ CHỐI KÝ (Điều 5 TT 15/2025).",
+            "validation_result": vr,
+        })
+    except (MechanismUnavailableError, SigningFormatUnavailableError) as exc:
+        raise HTTPException(status_code=409, detail={"message_vi": exc.message, "detail": exc.detail})
+    except SignerError as exc:
+        raise HTTPException(status_code=400, detail={"message_vi": exc.message, "detail": exc.detail})
+
+    _log.info(
+        "sign OK token=%s fmt=%s mech=%s evidence=%s",
+        body.token_id, result.format, result.mechanism, result.evidence_id,
+    )
+    return {
+        "signed_document_base64": result.signed_document_b64,
+        "validation_result": result.validation.model_dump(mode="json"),
+        "evidence_id": result.evidence_id,
+        "format": result.format,
+        "mechanism": result.mechanism,
+        "signature_algorithm": result.signature_algorithm,
+        "signing_time": result.signing_time.isoformat(),
+        "timestamped": result.timestamped,
+        "reasons_vi": result.reasons_vi,
+    }
 
 
 # --------------------------------------------------------------------------- #

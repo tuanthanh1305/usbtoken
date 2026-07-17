@@ -4,12 +4,29 @@
 # ⚠️ CHƯA ĐIỀN. Đây là KHUNG RỖNG.
 #
 # BẮT BUỘC: TRANSCRIBE trực tiếp từ bản gốc — KHÔNG suy đoán thuật toán, độ dài
-# khoá hay định dạng:
+# khoá, hàm băm hay định dạng/phiên bản:
 #   https://rootca.gov.vn/VanBan/Thongtu_So15_2025_TT_BKHCN.pdf
 #
 # Khi đã điền và rà soát đối chiếu bản gốc, đổi:  status: filled
-# Trước khi đó, core/trust/policy.py sẽ TỪ CHỐI mọi kiểm tra "chặt" theo Phụ lục
-# (fail-safe) — cố ý, để không tạo ra kết luận sai về pháp lý.
+# Trước khi đó, core/trust/policy.py TỪ CHỐI mọi kiểm tra "chặt" theo Phụ lục và
+# core/signer.py TỪ CHỐI KÝ (fail-closed) — cố ý, để không tạo kết luận/chữ ký
+# sai về pháp lý. Đây là ràng buộc AN TOÀN, KHÔNG phải thiếu sót.
+# ----------------------------------------------------------------------------
+#
+# ▸ signature_algorithms: chọn TẬP CON các định danh mà Phụ lục I cho phép. Phần
+#   mềm (core/signer.py) HIỆN thực theo chuẩn các định danh sau — dùng ĐÚNG chuỗi
+#   này để signer ánh xạ sang cơ chế PKCS#11 + OID (đây là TRI THỨC CHUẨN, KHÔNG
+#   phải lựa chọn pháp lý; CÁI NÀO hợp lệ là do Phụ lục I quy định):
+#       RSASSA-PKCS1-v1_5-SHA256   RSASSA-PKCS1-v1_5-SHA384   RSASSA-PKCS1-v1_5-SHA512
+#       RSASSA-PSS-SHA256
+#       ECDSA-SHA256               ECDSA-SHA384               ECDSA-SHA512
+#   Nếu Phụ lục I yêu cầu thuật toán NGOÀI danh mục trên -> KHÔNG tự thêm; cập
+#   nhật registry trong core/signer.py theo đúng chuẩn rồi mới dùng.
+#
+# ▸ min_key_sizes: số bit tối thiểu THEO PHỤ LỤC I (0 = CHƯA điền).
+# ▸ signature_formats: CAdES(cms)/PAdES/XAdES kèm PROFILE/PHIÊN BẢN cụ thể.
+# ▸ timestamp: điều kiện luật yêu cầu gắn dấu thời gian (TSA) + profile. Tham
+#   chiếu QCVN 138:2025/BKHCN (TT 51/2025) khi áp dụng.
 # ----------------------------------------------------------------------------
 
 status: not_filled          # not_filled | filled | verified
@@ -17,11 +34,11 @@ source_url: "https://rootca.gov.vn/VanBan/Thongtu_So15_2025_TT_BKHCN.pdf"
 transcribed_by: ""
 transcribed_at: ""
 
-# --- CHỜ ĐIỀN TỪ BẢN GỐC (ví dụ cấu trúc, giá trị PHẢI lấy từ PDF) ---------
-signature_algorithms: []    # ví dụ khung: ["RSASSA-PKCS1-v1_5-SHA256", ...]
-hash_algorithms: []
-min_key_sizes: {}           # ví dụ khung: { RSA: 0, EC: 0 }  (điền số thật từ PDF)
+# --- CHỜ ĐIỀN TỪ BẢN GỐC (giá trị PHẢI lấy từ PDF) ------------------------
+signature_algorithms: []    # tập con các định danh ở danh mục trên
+hash_algorithms: []         # ví dụ khung: ["SHA256", "SHA384", "SHA512"]
+min_key_sizes: {}           # ví dụ khung: { RSA: 0, EC: 0 } — điền số thật
 timestamp:
   required_when: ""         # điều kiện luật yêu cầu gắn dấu thời gian
-  tsa_profile: ""
-signature_formats: []       # ví dụ: CAdES / PAdES / XAdES — theo đúng Phụ lục I
+  tsa_profile: ""           # profile TSA (tham chiếu QCVN 138:2025)
+signature_formats: []       # ví dụ: ["CAdES", "PAdES-?", "XAdES-?"] — kèm profile
