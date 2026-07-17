@@ -10,7 +10,9 @@ from typing import TYPE_CHECKING
 from core.config import text_matches_ca_keyword
 
 from .base import (
+    FALLBACK_WIN_CERTSTORE,
     BinaryArch,
+    FallbackCert,
     HostArch,
     PlatformAdapter,
     PlatformName,
@@ -229,8 +231,14 @@ class WindowsAdapter(PlatformAdapter):
                     return tokens[-1].upper()
         return ""
 
-    def certstore_fallback(self) -> list[bytes]:
-        certs: list[bytes] = []
+    def certstore_fallback(self) -> list[FallbackCert]:
+        """Đọc chứng thư từ Windows CertStore "MY" (crypt32, đóng store đúng cách).
+
+        LÝ DO: nhiều middleware CA Việt Nam TỰ ĐẨY chứng thư vào store "MY" khi
+        cắm token — nhờ đó đọc được cert cả khi KHÔNG dò ra DLL PKCS#11.
+        """
+        certs: list[FallbackCert] = []
+        store = "MY"
         try:
             import ctypes
         except ImportError:
@@ -239,15 +247,18 @@ class WindowsAdapter(PlatformAdapter):
             crypt32 = ctypes.WinDLL("crypt32.dll")  # type: ignore[attr-defined]
         except (OSError, AttributeError):
             return certs
-        store = crypt32.CertOpenSystemStoreW(None, "MY")
-        if not store:
+        h_store = crypt32.CertOpenSystemStoreW(None, store)
+        if not h_store:
             return certs
-        p_ctx = crypt32.CertEnumCertificatesInStore(store, None)
-        while p_ctx:
-            ctx = ctypes.cast(p_ctx, ctypes.POINTER(_CERT_CONTEXT)).contents
-            certs.append(ctypes.string_at(ctx.pbCertEncoded, ctx.cbCertEncoded))
-            p_ctx = crypt32.CertEnumCertificatesInStore(store, p_ctx)
-        crypt32.CertCloseStore(store, 0)
+        try:
+            p_ctx = crypt32.CertEnumCertificatesInStore(h_store, None)
+            while p_ctx:
+                ctx = ctypes.cast(p_ctx, ctypes.POINTER(_CERT_CONTEXT)).contents
+                der = ctypes.string_at(ctx.pbCertEncoded, ctx.cbCertEncoded)
+                certs.append(FallbackCert(der=der, source=FALLBACK_WIN_CERTSTORE, origin=store))
+                p_ctx = crypt32.CertEnumCertificatesInStore(h_store, p_ctx)
+        finally:
+            crypt32.CertCloseStore(h_store, 0)  # đóng store đúng cách (không rò handle)
         return certs
 
     # -- Thư mục chuẩn & chạy nền --------------------------------------- #

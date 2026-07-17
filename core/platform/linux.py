@@ -17,7 +17,9 @@ from typing import TYPE_CHECKING
 from core.config import text_matches_ca_keyword
 
 from .base import (
+    FALLBACK_LINUX_NSS,
     BinaryArch,
+    FallbackCert,
     HostArch,
     PlatformAdapter,
     PlatformName,
@@ -303,9 +305,14 @@ class LinuxAdapter(PlatformAdapter):
         proc = self._run_proc(["systemctl", "is-active", "pcscd"])
         return proc is not None and proc.stdout.strip() == "active"
 
-    def certstore_fallback(self) -> list[bytes]:
-        """Xuất chứng thư từ NSS DB (~/.pki/nssdb) qua certutil (PEM -> DER)."""
-        certs: list[bytes] = []
+    def certstore_fallback(self) -> list[FallbackCert]:
+        """Xuất chứng thư từ NSS DB (~/.pki/nssdb) qua certutil (PEM -> DER).
+
+        NSS DB là nơi Firefox/Chrome/middleware lưu chứng thư — có thể còn cert
+        của token cả khi module PKCS#11 không dò ra. Tag ``LINUX_NSS`` + nickname
+        để audit.
+        """
+        certs: list[FallbackCert] = []
         nssdb = Path.home() / ".pki" / "nssdb"
         if not nssdb.is_dir():
             return certs
@@ -321,8 +328,36 @@ class LinuxAdapter(PlatformAdapter):
                 continue
             pem = self._run(["certutil", "-d", f"sql:{nssdb}", "-L", "-a", "-n", nickname])
             for der in _pem_to_der(pem.decode("utf-8", "ignore")):
-                certs.append(der)
+                certs.append(
+                    FallbackCert(der=der, source=FALLBACK_LINUX_NSS, origin=nickname)
+                )
         return certs
+
+    def nss_modules(self) -> list[str]:
+        """Liệt kê PKCS#11 module đã đăng ký với NSS (``modutil -list``).
+
+        Chỉ để CHẨN ĐOÁN. Trả rỗng nếu không có DB/modutil.
+        """
+        nssdb = Path.home() / ".pki" / "nssdb"
+        if not nssdb.is_dir():
+            return []
+        proc = self._run_proc(["modutil", "-dbdir", f"sql:{nssdb}", "-list"])
+        if proc is None or proc.returncode != 0:
+            return []
+        return [ln.strip() for ln in proc.stdout.splitlines() if ln.strip()]
+
+    def enroll_module_to_nss(self, lib_path: Path, *, name: str = "VN eSign Token") -> str:
+        """Trả LỆNH ``modutil -add`` để đăng ký module vào NSS (Firefox/Chrome).
+
+        ⚠️ CHỈ IN RA / TRẢ VỀ lệnh — TUYỆT ĐỐI KHÔNG tự chạy khi chưa xin phép
+        (sửa NSS DB của trình duyệt là thao tác có tác dụng phụ). Người dùng tự
+        chạy sau khi đồng ý.
+        """
+        nssdb = Path.home() / ".pki" / "nssdb"
+        return (
+            f'modutil -dbdir sql:{nssdb} -add "{name}" '
+            f'-libfile "{lib_path}"'
+        )
 
     # -- Thư mục chuẩn & chạy nền --------------------------------------- #
     def config_dir(self) -> Path:

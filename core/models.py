@@ -300,6 +300,52 @@ class ValidationResult(_Base):
 
 
 # --------------------------------------------------------------------------- #
+# Tổng hợp đa nguồn (aggregator) — ĐỒNG NHẤT 3 OS                              #
+# --------------------------------------------------------------------------- #
+class CertRecord(_Base):
+    """Một chứng thư đã được LÀM GIÀU: nội dung + CA (chain) + hiệu lực + nguồn.
+
+    Gộp đủ 4 mảnh cho tầng UI/nghiệp vụ: :class:`CertInfo` (kèm ``key``:
+    :class:`KeyInfo`), :class:`CAInfo` (từ chain building), và
+    :class:`ValidationResult` (bằng chứng pháp lý). ``source`` + ``from_token``
+    đánh dấu rõ chứng thư đọc TRỰC TIẾP từ token hay chỉ CACHE trong kho OS.
+    """
+
+    cert: CertInfo
+    ca: CAInfo = Field(default_factory=CAInfo)
+    validation: ValidationResult
+    source: str = Field(
+        default="",
+        description="PKCS11 | BRIDGE | P11KIT | PACKAGE | WIN_CERTSTORE | MAC_KEYCHAIN | LINUX_NSS.",
+    )
+    from_token: bool = Field(
+        default=False, description="True: đọc trực tiếp từ token; False: cache trong kho OS."
+    )
+    token_ref: str = Field(default="", description="Định danh token nguồn (nếu from_token).")
+
+
+class TokenBundle(_Base):
+    """Một token kèm danh sách chứng thư đã làm giàu trên nó."""
+
+    token: TokenInfo
+    certificates: list[CertRecord] = Field(default_factory=list)
+
+
+class AggregateResult(_Base):
+    """Kết quả gộp TẤT CẢ nguồn (PKCS11/BRIDGE/P11KIT/PACKAGE + fallback OS).
+
+    ⚠️ ``fallback_certificates`` là chứng thư từ kho hệ điều hành, KHÔNG đọc trực
+    tiếp từ token — vẫn đã qua validator như mọi chứng thư khác. Đánh dấu rõ để
+    người dùng phân biệt.
+    """
+
+    tokens: list[TokenBundle] = Field(default_factory=list)
+    fallback_certificates: list[CertRecord] = Field(default_factory=list)
+    sources_scanned: list[str] = Field(default_factory=list)
+    warnings: list[str] = Field(default_factory=list)
+
+
+# --------------------------------------------------------------------------- #
 # Lỗi — thông báo & remediation theo OS                                        #
 # --------------------------------------------------------------------------- #
 class ErrorCode(str, Enum):
@@ -345,6 +391,9 @@ __all__ = [
     "TrustPathNode",
     "RevocationEvidence",
     "ValidationResult",
+    "CertRecord",
+    "TokenBundle",
+    "AggregateResult",
     "ErrorCode",
     "ErrorInfo",
 ]

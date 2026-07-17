@@ -77,6 +77,33 @@ class ModuleCandidateRaw:
     warnings: list[str] = field(default_factory=list)
 
 
+# Nhãn nguồn fallback theo OS (ổn định — dùng ở aggregator để xếp ưu tiên & audit).
+FALLBACK_WIN_CERTSTORE = "WIN_CERTSTORE"
+FALLBACK_MAC_KEYCHAIN = "MAC_KEYCHAIN"
+FALLBACK_LINUX_NSS = "LINUX_NSS"
+
+
+@dataclass(slots=True)
+class FallbackCert:
+    """Một chứng thư (DER) đọc từ KHO HỆ ĐIỀU HÀNH, KHÔNG trực tiếp từ token.
+
+    ⚠️ Có mặt trong kho OS KHÔNG có nghĩa là hợp lệ — vẫn PHẢI qua trust
+    validator. ``source`` đánh dấu rõ xuất xứ để người dùng biết chứng thư này
+    được middleware/hệ điều hành cache lại, không đọc trực tiếp từ chip.
+
+    Attributes:
+        der:    Chứng thư mã hoá DER.
+        source: Nhãn nguồn: WIN_CERTSTORE | MAC_KEYCHAIN | LINUX_NSS.
+        origin: Chi tiết vị trí (tên store/keychain/nickname) để audit.
+        label:  Nhãn thân thiện nếu OS cung cấp (không bắt buộc).
+    """
+
+    der: bytes
+    source: str
+    origin: str = ""
+    label: str = ""
+
+
 def normalize_machine(raw: str) -> Literal["arm64", "x86_64"]:
     """Chuẩn hoá chuỗi machine thô của các OS về hai họ CPU thống nhất."""
     token = raw.lower()
@@ -190,8 +217,14 @@ class PlatformAdapter(abc.ABC):
         """``(ready, remediation)`` — remediation rỗng nếu PC/SC đã sẵn sàng."""
 
     @abc.abstractmethod
-    def certstore_fallback(self) -> list[bytes]:
-        """Chứng thư (DER) từ kho OS: CertStore MY | Keychain | NSS DB."""
+    def certstore_fallback(self) -> list["FallbackCert"]:
+        """Chứng thư từ kho OS: CertStore MY | Keychain | NSS DB.
+
+        DÙNG KHI PKCS#11 không dò ra module nhưng cert VẪN nằm trong kho hệ điều
+        hành (nhiều middleware CA Việt Nam tự đẩy cert vào kho khi cắm token).
+        Mỗi phần tử kèm ``source`` để aggregator đánh dấu "không đọc trực tiếp từ
+        token". KHÔNG kết luận hợp lệ ở đây — validator quyết định.
+        """
 
     # ------------------------------------------------------------------ #
     # Thư mục chuẩn & chạy nền                                            #
@@ -315,6 +348,10 @@ __all__ = [
     "HostArch",
     "BinaryArch",
     "ModuleCandidateRaw",
+    "FallbackCert",
+    "FALLBACK_WIN_CERTSTORE",
+    "FALLBACK_MAC_KEYCHAIN",
+    "FALLBACK_LINUX_NSS",
     "normalize_machine",
     "detect_host_arch",
     "PlatformAdapter",

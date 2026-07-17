@@ -11,7 +11,11 @@ import functools
 import platform
 
 from .base import (
+    FALLBACK_LINUX_NSS,
+    FALLBACK_MAC_KEYCHAIN,
+    FALLBACK_WIN_CERTSTORE,
     BinaryArch,
+    FallbackCert,
     HostArch,
     ModuleCandidateRaw,
     PlatformAdapter,
@@ -55,6 +59,10 @@ __all__ = [
     "HostArch",
     "BinaryArch",
     "ModuleCandidateRaw",
+    "FallbackCert",
+    "FALLBACK_WIN_CERTSTORE",
+    "FALLBACK_MAC_KEYCHAIN",
+    "FALLBACK_LINUX_NSS",
     "detect_host_arch",
     "normalize_machine",
 ]

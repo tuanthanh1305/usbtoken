@@ -14,7 +14,9 @@ from core.config import text_matches_ca_keyword
 from core.errors import BridgeUnavailableError
 
 from .base import (
+    FALLBACK_MAC_KEYCHAIN,
     BinaryArch,
+    FallbackCert,
     HostArch,
     PlatformAdapter,
     PlatformName,
@@ -23,6 +25,9 @@ from .base import (
 
 if TYPE_CHECKING:
     from core.bridge.client import BridgeClient
+
+# Keychain hệ thống — nơi middleware/CTK có thể đẩy chứng thư khi cắm token.
+_SYSTEM_KEYCHAIN = "/Library/Keychains/System.keychain"
 
 # pcsc-lite từ Homebrew — xung đột với PCSC.framework sẵn có của macOS.
 _HOMEBREW_PCSCD = (Path("/opt/homebrew/bin/pcscd"), Path("/usr/local/bin/pcscd"))
@@ -259,9 +264,41 @@ class MacOSAdapter(PlatformAdapter):
                 "pluginkit -m -p com.apple.ctk-tokens" + conflict_note
             )
 
-    def certstore_fallback(self) -> list[bytes]:
-        raw = self._run(["security", "find-certificate", "-a", "-p"])
-        return _pem_blocks_to_der(raw.decode("utf-8", "ignore")) if raw else []
+    def certstore_fallback(self) -> list[FallbackCert]:
+        """Xuất chứng thư từ Keychain (login + System) qua ``security``.
+
+        ``security find-certificate -a -p`` trả PEM; đổi sang DER. Quét cả
+        keychain mặc định (login) lẫn System — nơi CTK/middleware có thể đẩy
+        chứng thư của token vào. Khử trùng lặp theo DER (giữ nguồn đầu tiên).
+        """
+        out: list[FallbackCert] = []
+        seen: set[bytes] = set()
+        # (origin, argv): login/mặc định trước, rồi System keychain.
+        scans = [
+            ("login", ["security", "find-certificate", "-a", "-p"]),
+            ("System", ["security", "find-certificate", "-a", "-p", _SYSTEM_KEYCHAIN]),
+        ]
+        for origin, argv in scans:
+            raw = self._run(argv)
+            if not raw:
+                continue
+            for der in _pem_blocks_to_der(raw.decode("utf-8", "ignore")):
+                if der in seen:
+                    continue
+                seen.add(der)
+                out.append(FallbackCert(der=der, source=FALLBACK_MAC_KEYCHAIN, origin=origin))
+        return out
+
+    def list_smartcards(self) -> list[str]:
+        """Liệt kê token CTK do macOS thấy (``security list-smartcards``).
+
+        Chỉ để CHẨN ĐOÁN (biết có thẻ nhưng chưa dò ra module) — KHÔNG kết luận
+        CA. Trả rỗng nếu lệnh không có/không token.
+        """
+        raw = self._run(["security", "list-smartcards"])
+        if not raw:
+            return []
+        return [ln.strip() for ln in raw.decode("utf-8", "ignore").splitlines() if ln.strip()]
 
     # -- Thư mục chuẩn & chạy nền --------------------------------------- #
     def config_dir(self) -> Path:
