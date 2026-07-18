@@ -89,6 +89,12 @@ class ESignGatewayError(VNeSignError):
     code = ErrorCode.ESIGN_GATEWAY_ERROR
 
 
+class EvidenceError(VNeSignError):
+    """Lỗi kho bằng chứng ký (lưu trữ/toàn vẹn/lưu giữ)."""
+
+    code = ErrorCode.EVIDENCE_ERROR
+
+
 __all__ = [
     "VNeSignError",
     "UnsupportedPlatformError",
@@ -104,4 +110,5 @@ __all__ = [
     "MechanismUnavailableError",
     "SigningFormatUnavailableError",
     "ESignGatewayError",
+    "EvidenceError",
 ]

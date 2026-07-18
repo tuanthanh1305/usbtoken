@@ -379,6 +379,7 @@ class ErrorCode(str, Enum):
     TOKEN_NOT_PRESENT = "token_not_present"
     LOGIN_REQUIRED = "login_required"
     VALIDATION_FAILED = "validation_failed"
+    EVIDENCE_ERROR = "evidence_error"
     SIGN_FAILED = "sign_failed"
     SIGN_FORMAT_UNAVAILABLE = "sign_format_unavailable"
     MECHANISM_UNAVAILABLE = "mechanism_unavailable"
