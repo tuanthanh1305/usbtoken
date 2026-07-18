@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  entitlements.plist — BẮT BUỘC khi codesign daemon vn-esign với hardened runtime
+  (`codesign --options runtime`). Truyền: codesign ... --entitlements this.plist
+
+  ⭐⭐ com.apple.security.cs.disable-library-validation ⭐⭐
+     THIẾU entitlement này = KHÔNG dlopen được middleware PKCS#11 của CA.
+     Vì sao: Library Validation của Apple CHẶN nạp .dylib được ký bởi Team ID
+     KHÁC (middleware của FPT/Viettel/VNPT... ký bằng Team ID của họ, không phải
+     của ta). Không tắt Library Validation -> C_Initialize/dlopen thất bại với lỗi
+     rất KHÓ ĐOÁN ("code signature invalid" / "library load disallowed").
+     Đây là nguyên nhân số 1 khiến app ký-số trên macOS "không thấy token".
+
+  Các entitlement kèm theo (Python nhúng + PyInstaller thường cần):
+   * allow-dyld-environment-variables: helper Rosetta cần đặt biến môi trường nạp.
+   * allow-unsigned-executable-memory / allow-jit: một số extension/Python cần.
+-->
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+  <dict>
+    <key>com.apple.security.cs.disable-library-validation</key>
+    <true/>
+    <key>com.apple.security.cs.allow-dyld-environment-variables</key>
+    <true/>
+    <key>com.apple.security.cs.allow-unsigned-executable-memory</key>
+    <true/>
+    <key>com.apple.security.cs.allow-jit</key>
+    <true/>
+  </dict>
+</plist>

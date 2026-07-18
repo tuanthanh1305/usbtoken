@@ -1,9 +1,19 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
-  launchd agent cho daemon vn-esign (macOS).
+  LaunchAgent cho daemon vn-esign (macOS).
     cp packaging/macos/com.vn-esign.service.plist ~/Library/LaunchAgents/
     launchctl load ~/Library/LaunchAgents/com.vn-esign.service.plist
-  Chỉnh ProgramArguments theo nơi cài (khuyến nghị bản universal2).
+
+  ⭐ VÌ SAO LaunchAgent (~/Library/LaunchAgents) CHỨ KHÔNG LaunchDaemon
+     (/Library/LaunchDaemons)?
+     LaunchDaemon chạy ở ngữ cảnh HỆ THỐNG, TRƯỚC/NGOÀI phiên đăng nhập đồ hoạ.
+     Ở đó tiến trình thường KHÔNG thấy USB smart-card reader gắn theo PHIÊN của
+     user (SmartCard/TokenKit + PC/SC bám theo session đăng nhập). LaunchAgent
+     chạy TRONG phiên user → thấy reader/token, và least-privilege (không cần
+     root). Tương tự Task Scheduler at-logon trên Windows.
+
+  RunAtLoad + KeepAlive: tự chạy khi đăng nhập, tự bật lại nếu thoát.
+  Sửa ProgramArguments + USERNAME theo nơi cài (bản universal2 trong .app).
 -->
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
   "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -13,11 +23,13 @@
     <string>com.vn-esign.service</string>
     <key>ProgramArguments</key>
     <array>
-      <string>/usr/local/bin/vn-esign-service</string>
+      <string>/Applications/vn-esign-service.app/Contents/MacOS/vn-esign-service</string>
     </array>
     <key>RunAtLoad</key><true/>
     <key>KeepAlive</key><true/>
-    <key>StandardOutPath</key><string>/tmp/vn-esign.out.log</string>
-    <key>StandardErrorPath</key><string>/tmp/vn-esign.err.log</string>
+    <key>ProcessType</key><string>Interactive</string>
+    <!-- Log vào thư mục của user (không /tmp chung). -->
+    <key>StandardOutPath</key><string>/Users/USERNAME/Library/Logs/vn-esign-suite/agent.out.log</string>
+    <key>StandardErrorPath</key><string>/Users/USERNAME/Library/Logs/vn-esign-suite/agent.err.log</string>
   </dict>
 </plist>

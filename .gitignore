@@ -16,6 +16,8 @@ venv/
 # --- PyInstaller ---
 *.spec
 *.manifest
+# Nhưng GIỮ các spec đóng gói viết tay (là sản phẩm bàn giao, không phải sinh tự động).
+!packaging/windows/*.spec
 
 # --- Node / Vite (web) ---
 web/node_modules/

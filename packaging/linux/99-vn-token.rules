@@ -1,0 +1,8 @@
+# /etc/udev/rules.d/99-vn-token.rules
+# Cấp quyền USB token ký số cho nhóm plugdev + uaccess (khớp nội dung mà
+# core/platform/linux.py gợi ý và tab "Chẩn đoán" của web hiển thị).
+#
+# Cài: cp packaging/linux/99-vn-token.rules /etc/udev/rules.d/
+#      udevadm control --reload-rules && udevadm trigger
+# Sau đó thêm user vào nhóm plugdev:  sudo usermod -aG plugdev "$USER"  (đăng nhập lại)
+SUBSYSTEM=="usb", ACTION=="add", ENV{DEVTYPE}=="usb_device", MODE="0660", GROUP="plugdev", TAG+="uaccess"

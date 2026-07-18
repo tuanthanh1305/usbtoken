@@ -1,0 +1,109 @@
+name: build
+
+# Kiểm thử + đóng gói native trên CẢ 3 OS (4 runner: Win, mac arm64, mac x86_64, Linux).
+# Ký/công chứng là bước PHÁT HÀNH riêng (dùng GitHub Secrets), không chạy ở CI PR.
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  # ---- 1) Kiểm thử trên 4 nền tảng ---------------------------------------- #
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: windows-latest, name: windows-x64 }
+          - { os: macos-14,       name: macos-arm64 }   # Apple Silicon
+          - { os: macos-13,       name: macos-x86_64 }  # Intel
+          - { os: ubuntu-latest,  name: linux-x64 }
+    runs-on: ${{ matrix.os }}
+    name: test-${{ matrix.name }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Cài phụ thuộc hệ thống (Linux PC/SC)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libpcsclite-dev swig
+      - name: Cài phụ thuộc Python
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt -r requirements-dev.txt
+      - name: Chạy test
+        run: python -m pytest -q
+
+  # ---- 2) Kiểm thử web (typecheck + build) -------------------------------- #
+  web:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - working-directory: web
+        run: |
+          npm ci
+          npm run typecheck
+          npm run build
+
+  # ---- 3) Đóng gói native (sau khi test xanh) ----------------------------- #
+  package:
+    needs: [test, web]
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: windows-latest, name: windows-x64 }
+          - { os: macos-14,       name: macos-arm64 }
+          - { os: macos-13,       name: macos-x86_64 }
+          - { os: ubuntu-latest,  name: linux-x64 }
+    runs-on: ${{ matrix.os }}
+    name: package-${{ matrix.name }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      # -- Linux: build ELF + .deb/.rpm/AppImage --
+      - name: Build Linux
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update && sudo apt-get install -y libpcsclite-dev swig ruby ruby-dev
+          sudo gem install --no-document fpm
+          bash packaging/linux/build.sh
+          bash packaging/linux/package.sh || true   # AppImage cần appimagetool (tuỳ chọn)
+
+      # -- macOS: build .app universal2 + helper x86_64 --
+      - name: Build macOS
+        if: runner.os == 'macOS'
+        run: bash packaging/macos/build.sh
+        # Ký + notarize là bước phát hành riêng (secrets); xem sign_notarize.sh.
+
+      # -- Windows: build daemon x64 (helper x86 cần Python 32-bit riêng ở phát hành) --
+      - name: Build Windows (daemon x64)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          python -m pip install -r requirements.txt pyinstaller==6.11.1
+          python -m packaging.common.bundle_trust_store --check
+          python -m PyInstaller --noconfirm --clean packaging/windows/vn-esign-service.spec
+
+      - name: Tải artefact
+        uses: actions/upload-artifact@v4
+        with:
+          name: vn-esign-${{ matrix.name }}
+          path: |
+            dist/**
+            *.deb
+            *.rpm
+          if-no-files-found: ignore
