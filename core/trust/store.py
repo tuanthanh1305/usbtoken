@@ -24,7 +24,7 @@ import json
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from cryptography import x509
 from cryptography.hazmat.primitives import hashes
@@ -56,7 +56,7 @@ def _ski(cert: x509.Certificate) -> bytes | None:
     """Subject Key Identifier (nếu có)."""
     try:
         ext = cert.extensions.get_extension_for_oid(ExtensionOID.SUBJECT_KEY_IDENTIFIER)
-        return bytes(ext.value.digest)
+        return bytes(cast(x509.SubjectKeyIdentifier, ext.value).digest)
     except x509.ExtensionNotFound:
         return None
 
@@ -65,7 +65,7 @@ def _aki(cert: x509.Certificate) -> bytes | None:
     """Authority Key Identifier (key_identifier, nếu có)."""
     try:
         ext = cert.extensions.get_extension_for_oid(ExtensionOID.AUTHORITY_KEY_IDENTIFIER)
-        kid = ext.value.key_identifier
+        kid = cast(x509.AuthorityKeyIdentifier, ext.value).key_identifier
         return bytes(kid) if kid is not None else None
     except x509.ExtensionNotFound:
         return None

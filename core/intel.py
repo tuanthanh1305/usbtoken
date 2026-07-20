@@ -284,8 +284,8 @@ def _main(argv: list[str] | None = None) -> int:
     print(f"Bảng vàng: {len(db.entries)} entry · lọc ra {len(entries)}")
     if db.errors:
         print(f"⚠️  {len(db.errors)} entry lỗi (đã bỏ qua):")
-        for e in db.errors:
-            print(f"     - {e}")
+        for err in db.errors:
+            print(f"     - {err}")
 
     if args.os:
         print(f"Đường dẫn tìm kiếm ({args.os}): {db.search_paths_for(args.os)}")

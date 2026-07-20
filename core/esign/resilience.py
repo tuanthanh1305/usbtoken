@@ -31,7 +31,7 @@ class RetryPolicy:
         if attempt <= 1:
             return 0.0
         raw = self.backoff_base_seconds * (2 ** (attempt - 2))
-        return min(raw, self.backoff_max_seconds)
+        return float(min(raw, self.backoff_max_seconds))
 
 
 class CircuitBreaker:

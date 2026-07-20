@@ -10,7 +10,7 @@ import queue
 import subprocess
 import threading
 import time
-from typing import Any
+from typing import Any, cast
 
 from .protocol import (
     M_ENUMERATE,
@@ -113,7 +113,7 @@ class BridgeClient:
 
     def ping(self, timeout: float = 5.0) -> dict[str, Any]:
         """Kiểm tra helper sống + lấy arch/bits/pykcs11 của nó."""
-        return self._rpc(M_PING, {}, timeout)
+        return cast("dict[str, Any]", self._rpc(M_PING, {}, timeout))
 
     def validate_module(self, module_path: str, timeout: float = 15.0) -> dict[str, Any]:
         """Xác thực module bằng C_GetInfo (trả dict như core.pkcs11_ops.get_info)."""

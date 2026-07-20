@@ -25,7 +25,7 @@ from __future__ import annotations
 import re
 import sys
 from collections.abc import Callable
-from typing import Any
+from typing import Any, cast
 
 from pydantic import BaseModel
 
@@ -141,7 +141,7 @@ def _make_reader(token: TokenInfo, adapter: PlatformAdapter, manager: Any) -> Re
                 # Bridge phải serialize -> chuỗi (không zeroize được qua process;
                 # đã đánh dấu sensitive, không log).
                 params["pin"] = pin.decode("utf-8", "ignore")
-            return manager.call(module, "read_certificates", params)
+            return cast("dict[str, Any]", manager.call(module, "read_certificates", params))
         from core import pkcs11_ops
 
         pin_str = pin.decode("utf-8", "ignore") if pin is not None else None

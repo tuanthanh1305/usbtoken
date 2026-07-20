@@ -92,7 +92,7 @@ def get_info(module_path: str) -> dict[str, Any]:
             return result
         try:
             info = lib.getInfo()
-            cver = getattr(info, "cryptokiVersion", None)
+            cver: Any = getattr(info, "cryptokiVersion", None)
             if hasattr(cver, "major"):
                 result["cryptoki_version"] = [int(cver.major), int(cver.minor)]
             elif isinstance(cver, list | tuple) and len(cver) >= 2:

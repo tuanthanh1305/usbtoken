@@ -16,6 +16,7 @@ import asyncio
 import base64
 import logging
 from datetime import datetime, timezone
+from typing import cast
 
 from fastapi import APIRouter, HTTPException, Request, WebSocket, WebSocketDisconnect
 from pydantic import BaseModel, Field
@@ -115,7 +116,7 @@ def _token_bundle_view(token: TokenInfo, records: list[CertRecord]) -> dict[str,
 def _find_token(deps, token_id: str) -> TokenInfo | None:  # type: ignore[no-untyped-def]
     for token in deps.enumerate_fn():
         if token_public_id(token) == token_id:
-            return token
+            return cast(TokenInfo, token)
     return None
 
 
@@ -399,7 +400,11 @@ def sign(body: SignBody, request: Request) -> dict[str, object]:
         )
     except SigningNotAllowedError as exc:
         _log.info("sign REFUSED token=%s: %s", body.token_id, getattr(exc, "detail", ""))
-        vr = exc.result.model_dump(mode="json") if getattr(exc, "result", None) is not None else None
+        vr = (
+            cast(ValidationResult, exc.result).model_dump(mode="json")
+            if getattr(exc, "result", None) is not None
+            else None
+        )
         raise HTTPException(status_code=422, detail={
             "message_vi": exc.message,
             "reason": "Chứng thư KHÔNG hợp lệ — TỪ CHỐI KÝ (Điều 5 TT 15/2025).",

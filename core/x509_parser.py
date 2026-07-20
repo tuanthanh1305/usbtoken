@@ -25,7 +25,7 @@ import base64
 import hashlib
 import re
 from datetime import datetime, timezone
-from typing import Any
+from typing import Any, cast
 
 from cryptography import x509
 from cryptography.hazmat.primitives.asymmetric import ec, rsa
@@ -137,7 +137,7 @@ def _extract_vn_ids(
 # --------------------------------------------------------------------------- #
 def _key_usage(cert: x509.Certificate) -> list[str]:
     try:
-        ku = cert.extensions.get_extension_for_oid(ExtensionOID.KEY_USAGE).value
+        ku = cast(x509.KeyUsage, cert.extensions.get_extension_for_oid(ExtensionOID.KEY_USAGE).value)
     except x509.ExtensionNotFound:
         return []
     names = []
@@ -159,7 +159,10 @@ def _key_usage(cert: x509.Certificate) -> list[str]:
 
 def _eku(cert: x509.Certificate) -> list[str]:
     try:
-        eku = cert.extensions.get_extension_for_oid(ExtensionOID.EXTENDED_KEY_USAGE).value
+        eku = cast(
+            x509.ExtendedKeyUsage,
+            cert.extensions.get_extension_for_oid(ExtensionOID.EXTENDED_KEY_USAGE).value,
+        )
     except x509.ExtensionNotFound:
         return []
     return [getattr(oid, "_name", None) or oid.dotted_string for oid in eku]
@@ -167,7 +170,10 @@ def _eku(cert: x509.Certificate) -> list[str]:
 
 def _basic_constraints(cert: x509.Certificate) -> BasicConstraints:
     try:
-        bc = cert.extensions.get_extension_for_oid(ExtensionOID.BASIC_CONSTRAINTS).value
+        bc = cast(
+            x509.BasicConstraints,
+            cert.extensions.get_extension_for_oid(ExtensionOID.BASIC_CONSTRAINTS).value,
+        )
         return BasicConstraints(ca=bool(bc.ca), path_length=bc.path_length)
     except x509.ExtensionNotFound:
         return BasicConstraints()
@@ -176,7 +182,7 @@ def _basic_constraints(cert: x509.Certificate) -> BasicConstraints:
 def _ski(cert: x509.Certificate) -> str:
     try:
         ext = cert.extensions.get_extension_for_oid(ExtensionOID.SUBJECT_KEY_IDENTIFIER)
-        return bytes(ext.value.digest).hex()
+        return bytes(cast(x509.SubjectKeyIdentifier, ext.value).digest).hex()
     except x509.ExtensionNotFound:
         return ""
 
@@ -184,7 +190,7 @@ def _ski(cert: x509.Certificate) -> str:
 def _aki(cert: x509.Certificate) -> str:
     try:
         ext = cert.extensions.get_extension_for_oid(ExtensionOID.AUTHORITY_KEY_IDENTIFIER)
-        kid = ext.value.key_identifier
+        kid = cast(x509.AuthorityKeyIdentifier, ext.value).key_identifier
         return bytes(kid).hex() if kid else ""
     except x509.ExtensionNotFound:
         return ""
@@ -197,7 +203,7 @@ def _aia_ocsp(cert: x509.Certificate) -> tuple[list[str], list[str]]:
         ext = cert.extensions.get_extension_for_oid(ExtensionOID.AUTHORITY_INFORMATION_ACCESS)
     except x509.ExtensionNotFound:
         return aia, ocsp
-    for desc in ext.value:
+    for desc in cast(x509.AuthorityInformationAccess, ext.value):
         loc = getattr(desc.access_location, "value", None)
         if not isinstance(loc, str):
             continue
@@ -214,7 +220,7 @@ def _crl_dps(cert: x509.Certificate) -> list[str]:
         ext = cert.extensions.get_extension_for_oid(ExtensionOID.CRL_DISTRIBUTION_POINTS)
     except x509.ExtensionNotFound:
         return urls
-    for dp in ext.value:
+    for dp in cast(x509.CRLDistributionPoints, ext.value):
         for name in dp.full_name or []:
             if isinstance(name, x509.UniformResourceIdentifier):
                 urls.append(name.value)

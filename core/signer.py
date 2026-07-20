@@ -26,9 +26,13 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any, Protocol
 
 from cryptography import x509 as cx509
+
+if TYPE_CHECKING:
+    from cryptography.hazmat.primitives import hashes
+    from cryptography.hazmat.primitives.serialization import Encoding
 
 from core.errors import (
     MechanismUnavailableError,
@@ -113,7 +117,7 @@ def _key_family(cert: cx509.Certificate) -> str:
 # --------------------------------------------------------------------------- #
 # Session tối thiểu mà signer cần (ModuleSession thoả; test tiêm bản giả)        #
 # --------------------------------------------------------------------------- #
-class _SigningSession:  # Protocol tối giản (documentary)
+class _SigningSession(Protocol):  # Protocol tối giản (documentary)
     def get_mechanisms(self, slot_id: int) -> list[str]: ...
     def sign(self, slot_id: int, key_id: str, mechanism: str, data: bytes, pin: str | None = None) -> bytes: ...
     def close(self) -> None: ...
@@ -135,7 +139,7 @@ class Signer:
         policy: Any = None,
         store: Any = None,
         adapter: PlatformAdapter | None = None,
-        session_factory: Callable[[TokenInfo], Any] | None = None,
+        session_factory: Callable[[TokenInfo], _SigningSession] | None = None,
         tsa_client: TsaClient | None = None,
         evidence_dir: Path | None = None,
         clock: Callable[[], datetime] = _utcnow,
@@ -529,7 +533,7 @@ class Signer:
         return evidence_id
 
     # -- session helper -------------------------------------------------- #
-    def _make_session(self, token: TokenInfo) -> Any:
+    def _make_session(self, token: TokenInfo) -> _SigningSession:
         if self._session_factory is not None:
             return self._session_factory(token)
         from core.bridge.router import ModuleSession
@@ -554,13 +558,13 @@ def _load_cert(cert_der: bytes) -> cx509.Certificate:
         raise SignerError("Không đọc được chứng thư người ký (DER không hợp lệ).") from exc
 
 
-def _sha256():  # type: ignore[no-untyped-def]
+def _sha256() -> hashes.SHA256:
     from cryptography.hazmat.primitives import hashes
 
     return hashes.SHA256()
 
 
-def _der_encoding():  # type: ignore[no-untyped-def]
+def _der_encoding() -> Encoding:
     from cryptography.hazmat.primitives.serialization import Encoding
 
     return Encoding.DER

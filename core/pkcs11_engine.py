@@ -128,7 +128,7 @@ def _enumerate_one(
     """Liệt kê token cho MỘT module (in-process hoặc bridge), có timeout."""
     session = ModuleSession(cand.path, adapter=adapter, manager=manager, ops=ops)
     try:
-        tokens = _run_with_timeout(session.enumerate_tokens, timeout)
+        tokens: list[TokenInfo] = _run_with_timeout(session.enumerate_tokens, timeout)
     finally:
         session.close()  # không đóng manager (được chia sẻ)
 

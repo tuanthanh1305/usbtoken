@@ -24,7 +24,7 @@ import socket
 from datetime import datetime, timezone
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 LOGGER_NAME = "vn_esign.service"
 STATE_FILENAME = "service.json"
@@ -124,7 +124,10 @@ def write_state_file(config_dir: Path, *, host: str, port: int, version: str) ->
 
 def read_state_file(config_dir: Path) -> dict[str, Any] | None:
     try:
-        return json.loads(state_file_path(config_dir).read_text(encoding="utf-8"))
+        return cast(
+            "dict[str, Any]",
+            json.loads(state_file_path(config_dir).read_text(encoding="utf-8")),
+        )
     except (OSError, ValueError):
         return None
 
@@ -155,7 +158,7 @@ class PcscEventsSource:
     def poll(self) -> list[dict[str, str]]:
         try:
             events, self._state = self._probe.poll_diff(self._state)
-            return events
+            return cast("list[dict[str, str]]", events)
         except Exception:  # noqa: BLE001
             return []
 

@@ -34,7 +34,7 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from core.errors import EvidenceError
 from core.models import ValidationResult
@@ -191,7 +191,7 @@ class AppendOnlyLedger:
 
     def _read_head(self) -> dict[str, Any] | None:
         try:
-            return json.loads(self._head_path.read_text(encoding="utf-8"))
+            return cast("dict[str, Any]", json.loads(self._head_path.read_text(encoding="utf-8")))
         except (OSError, ValueError):
             return None
 
@@ -353,7 +353,7 @@ class EvidenceStore:
             evidence_id=evidence_id, validation_status=payload["validation_status"],
             revocation_captured=revocation_captured,
         )
-        return record["evidence_id"]
+        return cast(str, record["evidence_id"])
 
     # -- ĐỌC ------------------------------------------------------------ #
     def get_record(self, evidence_id: str) -> dict[str, Any] | None:

@@ -23,11 +23,14 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Protocol
+from typing import TYPE_CHECKING, Protocol, cast
 
 from cryptography import x509
 from cryptography.hazmat.primitives import hashes
 from cryptography.x509.oid import ExtensionOID, NameOID
+
+if TYPE_CHECKING:
+    from cryptography.hazmat.primitives.serialization import Encoding
 
 from core import x509_parser
 from core.errors import SigningNotAllowedError
@@ -412,7 +415,7 @@ class CertificateValidator:
         )
 
 
-def _der():  # type: ignore[no-untyped-def]
+def _der() -> Encoding:
     from cryptography.hazmat.primitives.serialization import Encoding
 
     return Encoding.DER
@@ -423,7 +426,10 @@ def _check_ca_constraints(cert: x509.Certificate, *, intermediates_below: int) -
     reasons: list[str] = []
     ok = True
     try:
-        bc = cert.extensions.get_extension_for_oid(ExtensionOID.BASIC_CONSTRAINTS).value
+        bc = cast(
+            x509.BasicConstraints,
+            cert.extensions.get_extension_for_oid(ExtensionOID.BASIC_CONSTRAINTS).value,
+        )
         if not bc.ca:
             ok = False
             reasons.append(f"'{_ca_name(cert)}' không phải CA (BasicConstraints CA=FALSE).")
@@ -437,7 +443,10 @@ def _check_ca_constraints(cert: x509.Certificate, *, intermediates_below: int) -
         ok = False
         reasons.append(f"'{_ca_name(cert)}' thiếu BasicConstraints — không đủ điều kiện làm CA.")
     try:
-        ku = cert.extensions.get_extension_for_oid(ExtensionOID.KEY_USAGE).value
+        ku = cast(
+            x509.KeyUsage,
+            cert.extensions.get_extension_for_oid(ExtensionOID.KEY_USAGE).value,
+        )
         if not ku.key_cert_sign:
             ok = False
             reasons.append(f"'{_ca_name(cert)}' thiếu KeyUsage keyCertSign — không được cấp chứng thư.")

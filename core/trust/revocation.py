@@ -14,11 +14,16 @@ from __future__ import annotations
 import hashlib
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
+from typing import TYPE_CHECKING, cast
 
 from cryptography import x509
 from cryptography.x509.oid import ExtensionOID
 
 from core.models import RevocationStatus
+
+if TYPE_CHECKING:
+    from cryptography.hazmat.primitives.asymmetric.types import CertificateIssuerPublicKeyTypes
+    from cryptography.hazmat.primitives.serialization import Encoding
 
 
 @dataclass(slots=True)
@@ -41,7 +46,7 @@ def _crl_urls(cert: x509.Certificate) -> list[str]:
         ext = cert.extensions.get_extension_for_oid(ExtensionOID.CRL_DISTRIBUTION_POINTS)
     except x509.ExtensionNotFound:
         return urls
-    for dp in ext.value:
+    for dp in cast(x509.CRLDistributionPoints, ext.value):
         if dp.full_name:
             for name in dp.full_name:
                 if isinstance(name, x509.UniformResourceIdentifier):
@@ -150,12 +155,14 @@ class RevocationChecker:
         crl: x509.CertificateRevocationList, issuer: x509.Certificate
     ) -> bool:
         try:
-            return crl.is_signature_valid(issuer.public_key())
+            return crl.is_signature_valid(
+                cast("CertificateIssuerPublicKeyTypes", issuer.public_key())
+            )
         except Exception:  # noqa: BLE001
             return False
 
 
-def _der_encoding():  # type: ignore[no-untyped-def]
+def _der_encoding() -> Encoding:
     from cryptography.hazmat.primitives.serialization import Encoding
 
     return Encoding.DER

@@ -22,11 +22,12 @@ import sys
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 from urllib.parse import urlparse
 
 import yaml
 from cryptography import x509
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
 from core.config import (
     current_trust_store_dir,
@@ -204,7 +205,7 @@ def read_current_manifest() -> dict[str, Any]:
     if not p.is_file():
         return {}
     try:
-        return json.loads(p.read_text(encoding="utf-8"))
+        return cast("dict[str, Any]", json.loads(p.read_text(encoding="utf-8")))
     except (OSError, ValueError):
         return {}
 
@@ -264,7 +265,7 @@ def print_diff(report: dict[str, list[str]]) -> None:
 # --------------------------------------------------------------------------- #
 # Áp dụng (ghi kho + ký)                                                        #
 # --------------------------------------------------------------------------- #
-def _obtain_signing_key(signing_key_path: str) -> signing.Ed25519PrivateKey:
+def _obtain_signing_key(signing_key_path: str) -> Ed25519PrivateKey:
     """Lấy khoá ký: từ đường dẫn/biến môi trường, hoặc sinh khoá dev (kèm cảnh báo)."""
     import os
 
