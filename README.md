@@ -165,4 +165,5 @@ pytest                            # gồm test chain building + guard pháp lý
 
 ## Giấy phép
 
-Proprietary — dự án cấp quốc gia.
+[MIT](LICENSE) — giấy phép mã nguồn mở phổ biến, cho phép dùng/sửa/phân phối tự do
+kèm điều khoản miễn trừ bảo đảm. Xem chi tiết trong tệp `LICENSE`.

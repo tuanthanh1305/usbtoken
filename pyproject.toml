@@ -8,10 +8,12 @@ version = "0.1.0"
 description = "Phần mềm ký số & kiểm tra chữ ký số trên USB token cho Việt Nam — Windows/macOS/Linux ngang hàng, tuân thủ NĐ 23/2025 & TT 15/2025."
 readme = "README.md"
 requires-python = ">=3.11"
-license = { text = "Proprietary" }
+license = { text = "MIT" }
+license-files = ["LICENSE"]
 authors = [{ name = "vn-esign-suite" }]
 keywords = ["pkcs11", "digital-signature", "vietnam", "pki", "neac", "esign", "x509"]
 classifiers = [
+    "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Operating System :: Microsoft :: Windows",

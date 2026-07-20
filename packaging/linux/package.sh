@@ -32,7 +32,7 @@ DEPENDS=(--depends pcscd --depends libccid)         # opensc/p11-kit/libnss3-too
 COMMON=(
   -s dir -n vn-esign-suite -v "$VERSION" -a "$ARCH"
   --description "Phần mềm ký số & kiểm tra chữ ký số trên USB token (loopback)."
-  --url "https://rootca.gov.vn" --license "Proprietary"
+  --url "https://rootca.gov.vn" --license "MIT"
   --after-install packaging/linux/postinstall.sh
   --before-remove packaging/linux/preremove.sh
   "${DEPENDS[@]}"
