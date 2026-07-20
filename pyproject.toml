@@ -75,6 +75,8 @@ ignore = [
     "E501",    # độ dài dòng do formatter lo
     "UP017",   # dùng nhất quán datetime.timezone.utc (hợp lệ trên 3.11); không đổi sang datetime.UTC
     "SIM105",  # nhiều try/except/pass kèm chú thích "vì sao"; contextlib.suppress sẽ giấu mất chú thích
+    "UP042",   # giữ (str, Enum) CÓ CHỦ ĐÍCH: StrEnum đổi hành vi str()/format của các enum
+               # dùng trong hợp đồng API JSON và log; migration tiềm ẩn rủi ro hồi quy, không đáng đổi
 ]
 
 [tool.ruff.lint.isort]
