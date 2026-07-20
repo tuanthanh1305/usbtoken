@@ -121,7 +121,7 @@ class ModuleSession:
             self._manager.close()
             self._manager = None
 
-    def __enter__(self) -> "ModuleSession":
+    def __enter__(self) -> ModuleSession:
         return self
 
     def __exit__(self, *exc: object) -> None:

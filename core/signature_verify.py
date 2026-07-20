@@ -61,15 +61,17 @@ def verify_detached(
     algo = algorithm.lower()
 
     try:
-        if isinstance(pub, (ed25519.Ed25519PublicKey, ed448.Ed448PublicKey)):
+        if isinstance(pub, ed25519.Ed25519PublicKey | ed448.Ed448PublicKey):
             pub.verify(signature, data)  # EdDSA tự băm nội bộ, không nhận hash ngoài
         elif isinstance(pub, rsa.RSAPublicKey):
             h = _HASHES.get(algo)
             if h is None:
                 return False, f"Thuật toán băm không hỗ trợ: {algorithm}."
             if rsa_scheme.lower() == "pss":
+                # Khi KIỂM: dùng AUTO để suy độ dài salt từ chính chữ ký (MAX_LENGTH
+                # sẽ từ chối nhầm chữ ký PSS hợp lệ có salt khác độ dài tối đa).
                 pad: padding.AsymmetricPadding = padding.PSS(
-                    mgf=padding.MGF1(h()), salt_length=padding.PSS.MAX_LENGTH
+                    mgf=padding.MGF1(h()), salt_length=padding.PSS.AUTO
                 )
             else:
                 pad = padding.PKCS1v15()

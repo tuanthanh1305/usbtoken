@@ -79,7 +79,7 @@ def test_fingerprint_no_ca_field() -> None:
     fp = fingerprint_by_atr(b"\x3b\xaa", table={"entries": []})
     dumped = fp.model_dump()
     # TUYỆT ĐỐI không có bất kỳ trường nào về CA.
-    assert not any("ca" == k.lower() or "ca_" in k.lower() for k in dumped)
+    assert not any(k.lower() == "ca" or "ca_" in k.lower() for k in dumped)
     assert "note" in dumped and "KHÔNG kết luận CA" in dumped["note"]
 
 

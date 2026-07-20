@@ -39,6 +39,7 @@ from core.models import (
     ValidationResult,
     ValidationStatusCode,
 )
+
 from .anchors import load_certificate
 from .policy import CompliancePolicy
 from .store import TrustStore
@@ -123,6 +124,8 @@ class DefaultRevocationChecker:
         ev.status = outcome.status
         ev.source_url = outcome.source_url
         ev.crl_snapshot_sha256 = outcome.crl_sha256
+        ev.this_update = outcome.this_update
+        ev.next_update = outcome.next_update  # để validator kiểm độ tươi CRL online
         ev.reasons_vi.extend(outcome.reasons_vi)
         return ev
 
@@ -358,10 +361,13 @@ class CertificateValidator:
         if not foreign or not path:
             return False
         top = path[-1]
-        foreign_subjects = {c.subject.public_bytes() for c in foreign}
-        # Neo nước ngoài tự phát hành + là cha của top (hoặc chính top).
-        if top.subject.public_bytes() in foreign_subjects:
+        # (a) top CHÍNH LÀ một neo nước ngoài đã ghim — khớp VÂN TAY (mật mã),
+        # KHÔNG so Subject DN. So tên sẽ nhận nhầm một cert giả mạo chép DN của
+        # neo nước ngoài (khác khoá) là hợp lệ.
+        foreign_fps = {_fp(c) for c in foreign}
+        if _fp(top) in foreign_fps:
             return True
+        # (b) top được một neo nước ngoài phát hành TRỰC TIẾP (xác minh chữ ký).
         for anchor in foreign:
             if anchor.subject == top.issuer:
                 try:

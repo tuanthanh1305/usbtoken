@@ -10,16 +10,17 @@ from __future__ import annotations
 import base64
 from datetime import datetime, timezone
 
+import pytest
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric import padding
 from fastapi.testclient import TestClient
 
+from core import x509_parser
 from core.aggregator import SOURCE_PKCS11
 from core.cert_reader import CertReadResult
 from core.errors import SigningNotAllowedError
 from core.models import (
     AggregateResult,
-    CAInfo,
     CertRecord,
     ErrorCode,
     ErrorInfo,
@@ -27,17 +28,15 @@ from core.models import (
     SignResult,
     TokenBundle,
     TokenInfo,
-    TrustPathNode,
     ValidationResult,
     ValidationStatusCode,
 )
 from core.platform import FALLBACK_LINUX_NSS, get_adapter
-from service.app import create_app
 from service.api.gateway import token_public_id
+from service.app import create_app
 from service.deps import ServiceDeps
 from service.security import RateLimiter
 from service.sessions import SessionStore
-from core import x509_parser
 from tests.certs import make_chain
 
 
@@ -395,14 +394,14 @@ def test_ws_events_streams_insert_remove() -> None:
 
 
 def test_ws_events_rejects_bad_origin() -> None:
-    c = _client(_deps())
-    import pytest as _pytest
+    from starlette.websockets import WebSocketDisconnect
 
-    with _pytest.raises(Exception):  # noqa: BLE001 - đóng 1008 -> raise phía client
-        with c.websocket_connect(
-            "/events", headers={"host": "127.0.0.1:8787", "Origin": "http://evil.com"}
-        ) as ws:
-            ws.receive_json()
+    c = _client(_deps())
+    # Origin lạ -> server đóng WS với mã 1008 -> TestClient raise WebSocketDisconnect.
+    with pytest.raises(WebSocketDisconnect), c.websocket_connect(
+        "/events", headers={"host": "127.0.0.1:8787", "Origin": "http://evil.com"}
+    ) as ws:
+        ws.receive_json()
 
 
 # --------------------------------------------------------------------------- #

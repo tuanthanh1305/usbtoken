@@ -28,6 +28,7 @@ from pathlib import Path
 
 import pytest
 
+from core.errors import SigningNotAllowedError
 from core.models import (
     RevocationEvidence,
     RevocationStatus,
@@ -40,8 +41,7 @@ from core.trust.validator import (
     CertificateValidator,
     ValidatorConfig,
 )
-from core.errors import SigningNotAllowedError
-from tests.certs import IssuedCert, _make, make_chain
+from tests.certs import _make, make_chain
 
 
 # --------------------------------------------------------------------------- #
@@ -333,6 +333,19 @@ def test_foreign_recognized(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> 
 
     assert res.status is ValidationStatusCode.FOREIGN_RECOGNIZED
     assert any("NƯỚC NGOÀI" in r for r in res.reasons_vi)
+
+
+def test_foreign_dn_forgery_not_recognized(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    # REGRESSION: cert GIẢ MẠO chép Subject DN của neo nước ngoài (khác khoá, không
+    # do neo đó cấp) KHÔNG được coi là FOREIGN_RECOGNIZED — phải INVALID. Nếu chỉ so
+    # Subject DN (không kiểm mật mã) thì cert giả sẽ lọt.
+    foreign_root = _make("Foreign Recognized Root CA", None, is_ca=True)
+    other = _make("Some Other CA", None, is_ca=True)  # không có trong kho
+    forged = _make("Foreign Recognized Root CA", other, is_ca=True)  # trùng DN, khác khoá
+    store = _signed_store(tmp_path, monkeypatch, foreign=(foreign_root,))
+    res = _good_validator(store, allow_network=True).validate(forged.der)
+    assert res.status is not ValidationStatusCode.FOREIGN_RECOGNIZED
+    assert res.status is ValidationStatusCode.INVALID
 
 
 # --------------------------------------------------------------------------- #

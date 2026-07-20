@@ -6,8 +6,9 @@ token, đọc cert, nguồn sự kiện) đều TIÊM ĐƯỢC để test không
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Any, Callable
+from typing import Any
 
 from core.models import AggregateResult, TokenInfo
 from core.platform import PlatformAdapter, get_adapter
@@ -94,6 +95,5 @@ def build_default_deps(adapter: PlatformAdapter | None = None) -> ServiceDeps:
 
 # Import trễ để tránh vòng phụ thuộc ở đầu file.
 from service.runtime import PcscEventsSource  # noqa: E402
-
 
 __all__ = ["ServiceDeps", "build_default_deps"]

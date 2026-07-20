@@ -33,11 +33,12 @@ from cryptography.x509.oid import ExtensionOID, NameOID
 from core.config import (
     current_trust_store_dir,
     trust_audit_log_path,
-    trust_store_internal_dir,
     trust_signing_pub_path,
+    trust_store_internal_dir,
 )
+
 from .anchors import load_certificate
-from .signing import canonical_bytes, load_public_key, verify
+from .signing import load_public_key, verify
 
 _CERT_SUFFIXES = (".der", ".pem", ".crt", ".cer")
 _CRL_SUFFIXES = (".crl",)
@@ -417,7 +418,15 @@ def _load_manifest(store: TrustStore, directory: Path, *, verify_signature: bool
 
 
 def _verify_file_hashes(directory: Path, manifest: dict[str, Any]) -> bool:
-    for item in manifest.get("files", []) or []:
+    """Verify sha256 mọi file trong manifest VÀ mọi cert/CRL trên đĩa phải có trong
+    manifest (chống CHÈN neo tin cậy lạ vào kho đã ký).
+    """
+    files = manifest.get("files") or []
+    if not files:
+        return False  # manifest RỖNG không ràng buộc gì -> từ chối (fail-closed)
+
+    manifest_names: set[str] = set()
+    for item in files:
         name = item.get("name")
         expected = item.get("sha256")
         if not name or not expected:
@@ -426,6 +435,16 @@ def _verify_file_hashes(directory: Path, manifest: dict[str, Any]) -> bool:
         data = _safe_read(target)
         if data is None or _sha256_hex(data) != expected:
             return False
+        manifest_names.add(str(name).replace("\\", "/"))
+
+    # ⭐ Mọi file chứng thư/CRL TỒN TẠI TRÊN ĐĨA phải nằm trong manifest đã ký.
+    # Nếu không, kẻ tấn công có thể THÊM một neo gốc giả (không có trong manifest)
+    # mà chữ ký manifest vẫn hợp lệ -> phá gốc tin cậy.
+    for path in directory.rglob("*"):
+        if path.is_file() and path.suffix.lower() in (_CERT_SUFFIXES + _CRL_SUFFIXES):
+            rel = path.relative_to(directory).as_posix()
+            if rel not in manifest_names:
+                return False
     return True
 
 

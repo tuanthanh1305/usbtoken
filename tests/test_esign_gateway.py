@@ -25,7 +25,7 @@ from core.esign.gateway import (
     Transport,
     TransportError,
 )
-from core.esign.resilience import CircuitBreaker, RetryPolicy, run_with_resilience
+from core.esign.resilience import CircuitBreaker, RetryPolicy
 
 
 # --------------------------------------------------------------------------- #

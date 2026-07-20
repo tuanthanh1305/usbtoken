@@ -95,7 +95,7 @@ def get_info(module_path: str) -> dict[str, Any]:
             cver = getattr(info, "cryptokiVersion", None)
             if hasattr(cver, "major"):
                 result["cryptoki_version"] = [int(cver.major), int(cver.minor)]
-            elif isinstance(cver, (list, tuple)) and len(cver) >= 2:
+            elif isinstance(cver, list | tuple) and len(cver) >= 2:
                 result["cryptoki_version"] = [int(cver[0]), int(cver[1])]
             result["manufacturer"] = _clean(getattr(info, "manufacturerID", ""))
             result["library_description"] = _clean(getattr(info, "libraryDescription", ""))

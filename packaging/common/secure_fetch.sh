@@ -5,7 +5,7 @@
 #   secure_fetch "https://host/file" "/dest/path" "<sha256-hex>"
 #
 # TRIẾT LÝ AN TOÀN (đối lập với installer CA rủi ro):
-#   * CHỈ HTTPS + TLS1.2+, từ chối redirect sang http (--proto '=https').
+#   * CHỈ HTTPS + TLS1.2+, từ chối cả redirect sang http (--proto + --proto-redir).
 #   * Tải vào thư mục tạm CHỦ-SỞ-HỮU-ONLY (mktemp -d), KHÔNG /tmp cố định.
 #   * VERIFY sha256 ghim sẵn TRƯỚC khi dùng; sai -> xoá + thoát.
 #   * chmod 600/700 — KHÔNG BAO GIỜ 777.
@@ -36,8 +36,10 @@ secure_fetch() {
   local tmpfile="$tmpdir/download.bin"
 
   echo "→ Tải $url"
-  # --fail: HTTP lỗi -> mã thoát khác 0; --proto '=https': cấm nhảy sang http.
-  if ! curl --fail --location --proto '=https' --tlsv1.2 \
+  # --fail: HTTP lỗi -> mã thoát khác 0.
+  # --proto '=https' cấm URL ban đầu phi-HTTPS; --proto-redir '=https' cấm CẢ khi
+  # server 30x-redirect sang http (nếu thiếu, --location vẫn theo redirect http).
+  if ! curl --fail --location --proto '=https' --proto-redir '=https' --tlsv1.2 \
             --retry 3 --retry-delay 2 --connect-timeout 20 \
             -o "$tmpfile" "$url"; then
     echo "❌ Tải thất bại (mạng/HTTP): $url" >&2

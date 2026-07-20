@@ -71,7 +71,11 @@ src = ["core", "service", "tools", "tests"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM"]
-ignore = ["E501"]
+ignore = [
+    "E501",    # độ dài dòng do formatter lo
+    "UP017",   # dùng nhất quán datetime.timezone.utc (hợp lệ trên 3.11); không đổi sang datetime.UTC
+    "SIM105",  # nhiều try/except/pass kèm chú thích "vì sao"; contextlib.suppress sẽ giấu mất chú thích
+]
 
 [tool.ruff.lint.isort]
 known-first-party = ["core", "service", "tools"]

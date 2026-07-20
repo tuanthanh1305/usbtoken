@@ -195,7 +195,7 @@ class PlatformAdapter(abc.ABC):
         """True nếu ``lib_path`` lệch bitness/arch với host -> phải qua bridge."""
 
     @abc.abstractmethod
-    def spawn_bridge_helper(self, lib_path: Path) -> "BridgeClient":
+    def spawn_bridge_helper(self, lib_path: Path) -> BridgeClient:
         """Spawn helper CÙNG ARCH với ``lib_path`` và trả client IPC (JSON-RPC).
 
         Ném :class:`~core.errors.BridgeUnavailableError` nếu môi trường chưa đủ
@@ -217,7 +217,7 @@ class PlatformAdapter(abc.ABC):
         """``(ready, remediation)`` — remediation rỗng nếu PC/SC đã sẵn sàng."""
 
     @abc.abstractmethod
-    def certstore_fallback(self) -> list["FallbackCert"]:
+    def certstore_fallback(self) -> list[FallbackCert]:
         """Chứng thư từ kho OS: CertStore MY | Keychain | NSS DB.
 
         DÙNG KHI PKCS#11 không dò ra module nhưng cert VẪN nằm trong kho hệ điều

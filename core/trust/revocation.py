@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import hashlib
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
 
 from cryptography import x509
 from cryptography.x509.oid import ExtensionOID
@@ -28,6 +29,8 @@ class RevocationOutcome:
     crl_der: bytes | None = None
     crl_sha256: str = ""
     source_url: str = ""
+    this_update: datetime | None = None
+    next_update: datetime | None = None
     reasons_vi: list[str] = field(default_factory=list)
 
 
@@ -85,11 +88,23 @@ class RevocationChecker:
             outcome.crl_der = crl.public_bytes(_der_encoding())
             outcome.crl_sha256 = hashlib.sha256(outcome.crl_der).hexdigest()
             outcome.source_url = url
+            outcome.this_update = _crl_this_update(crl)
+            outcome.next_update = _crl_next_update(crl)
 
             # Xác thực chữ ký CRL bằng khoá công khai của CA phát hành (nếu có).
             if issuer is not None and not self._crl_signature_valid(crl, issuer):
                 outcome.status = RevocationStatus.UNKNOWN
                 outcome.reasons_vi.append("Chữ ký CRL không hợp lệ so với CA phát hành.")
+                return outcome
+
+            # CRL đã HẾT HẠN (nextUpdate quá khứ) -> KHÔNG đáng tin: fail-closed.
+            # Không được kết luận GOOD từ một CRL cũ (có thể trước khi cert bị thu hồi).
+            if outcome.next_update is not None and outcome.next_update < datetime.now(timezone.utc):
+                outcome.status = RevocationStatus.UNKNOWN
+                outcome.reasons_vi.append(
+                    f"CRL đã HẾT HẠN (nextUpdate {outcome.next_update.isoformat()}) — "
+                    "không đủ tin cậy để kết luận, để UNKNOWN (fail-closed)."
+                )
                 return outcome
 
             revoked = crl.get_revoked_certificate_by_serial_number(cert.serial_number)
@@ -144,6 +159,20 @@ def _der_encoding():  # type: ignore[no-untyped-def]
     from cryptography.hazmat.primitives.serialization import Encoding
 
     return Encoding.DER
+
+
+def _as_utc(dt: datetime | None) -> datetime | None:
+    if dt is None:
+        return None
+    return dt if dt.tzinfo is not None else dt.replace(tzinfo=timezone.utc)
+
+
+def _crl_this_update(crl: x509.CertificateRevocationList) -> datetime | None:
+    return _as_utc(getattr(crl, "last_update_utc", None) or getattr(crl, "last_update", None))
+
+
+def _crl_next_update(crl: x509.CertificateRevocationList) -> datetime | None:
+    return _as_utc(getattr(crl, "next_update_utc", None) or getattr(crl, "next_update", None))
 
 
 __all__ = ["RevocationChecker", "RevocationOutcome"]

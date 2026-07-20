@@ -269,8 +269,8 @@ def test_merge_include_fallback_false_skips_os_store() -> None:
 # Tích hợp: validator THẬT (kho rỗng -> INVALID) — vẫn đính bằng chứng          #
 # --------------------------------------------------------------------------- #
 def test_merge_with_real_validator_empty_store(tmp_path: Path) -> None:
-    from core.trust.store import TrustStore
     from core.trust.policy import CompliancePolicy
+    from core.trust.store import TrustStore
     from core.trust.validator import CertificateValidator
 
     _, _, leaf = make_chain()

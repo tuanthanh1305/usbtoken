@@ -19,7 +19,7 @@ from __future__ import annotations
 
 import threading
 import time
-from typing import Callable, Iterable
+from collections.abc import Callable, Iterable
 
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
@@ -59,9 +59,7 @@ def connection_allowed(
     if host not in set(allowed_hosts):
         return False
     origin = get("origin")
-    if origin is not None and origin not in set(allowed_origins):
-        return False
-    return True
+    return not (origin is not None and origin not in set(allowed_origins))
 
 
 class HostHeaderMiddleware(BaseHTTPMiddleware):
@@ -116,6 +114,7 @@ class RateLimiter:
         """True nếu còn lượt; đồng thời GHI NHẬN một lượt nếu cho phép."""
         now = self._clock()
         with self._lock:
+            self._evict_stale(now)  # dọn key hết hạn -> dict không phình vô hạn
             hits = [t for t in self._hits.get(key, []) if now - t < self._window]
             if len(hits) >= self._max:
                 self._hits[key] = hits
@@ -123,6 +122,12 @@ class RateLimiter:
             hits.append(now)
             self._hits[key] = hits
             return True
+
+    def _evict_stale(self, now: float) -> None:
+        """Xoá các key mà mọi mốc thời gian đã ra khỏi cửa sổ (giữ dict gọn)."""
+        stale = [k for k, ts in self._hits.items() if all(now - t >= self._window for t in ts)]
+        for k in stale:
+            del self._hits[k]
 
     def reset(self, key: str) -> None:
         """Xoá bộ đếm cho ``key`` (gọi sau khi đăng nhập THÀNH CÔNG)."""

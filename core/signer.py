@@ -22,10 +22,11 @@ from __future__ import annotations
 import base64
 import hashlib
 import secrets
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 from cryptography import x509 as cx509
 
@@ -33,9 +34,8 @@ from core.errors import (
     MechanismUnavailableError,
     SignerError,
     SigningFormatUnavailableError,
-    SigningNotAllowedError,
 )
-from core.models import SignResult, TokenInfo, ValidationResult, ValidationStatusCode
+from core.models import SignResult, TokenInfo, ValidationResult
 from core.platform import PlatformAdapter, get_adapter
 
 # --------------------------------------------------------------------------- #
@@ -48,7 +48,7 @@ _DIGESTINFO_PREFIX: dict[str, bytes] = {
     "sha384": bytes.fromhex("3041300d060960864801650304020205000430"),
     "sha512": bytes.fromhex("3051300d060960864801650304020305000440"),
 }
-_HASHERS: dict[str, Callable[[bytes], "hashlib._Hash"]] = {
+_HASHERS: dict[str, Callable[[bytes], hashlib._Hash]] = {
     "sha1": hashlib.sha1,
     "sha256": hashlib.sha256,
     "sha384": hashlib.sha384,
@@ -331,7 +331,15 @@ class Signer:
             if prefix is None:
                 raise SignerError(f"Thiếu DigestInfo prefix cho {spec.digest}.")
             return prefix + digest  # DigestInfo DER đúng chuẩn RFC 8017
-        # ECDSA / PSS băm-ngoài: token nhận thẳng giá trị băm.
+        if spec.cms_signature_algo == "rsassa_pss":
+            # RSA-PSS "băm-ngoài" (CKM_RSA_PKCS_PSS thô) cần tham số MGF/salt truyền
+            # kèm mechanism — không thể chỉ đưa giá trị băm. Từ chối để KHÔNG tạo
+            # chữ ký sai chuẩn; yêu cầu token hỗ trợ cơ chế băm-trong SHA*_RSA_PKCS_PSS.
+            raise MechanismUnavailableError(
+                "Token chỉ hỗ trợ RSA-PSS băm-ngoài (CKM_RSA_PKCS_PSS thô) — cần cơ chế "
+                "băm-trong (SHA*_RSA_PKCS_PSS) để ký PSS đúng chuẩn."
+            )
+        # ECDSA băm-ngoài: token nhận thẳng giá trị băm.
         return digest
 
     # ------------------------------------------------------------------ #
@@ -571,9 +579,8 @@ def _default_tsa_request(imprint: bytes, tsa_url: str, digest: str) -> bytes | N
     Ngoại lệ mạng ĐƯỢC PHÉP (CRL/OCSP/TSA + đồng bộ kho tin cậy). Lỗi -> None.
     """
     try:
-        from asn1crypto import tsp
-        from asn1crypto import algos
         import httpx
+        from asn1crypto import algos, tsp
 
         req = tsp.TimeStampReq({
             "version": "v1",

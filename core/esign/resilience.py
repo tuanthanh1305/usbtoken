@@ -9,8 +9,11 @@ cần chờ thực.
 from __future__ import annotations
 
 import time
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Callable
+from typing import TypeVar
+
+T = TypeVar("T")
 
 
 class CircuitOpenError(RuntimeError):
@@ -79,14 +82,14 @@ class CircuitBreaker:
 
 
 def run_with_resilience(
-    fn: Callable[[], "T"],
+    fn: Callable[[], T],
     *,
     retry: RetryPolicy,
     breaker: CircuitBreaker,
     is_retryable: Callable[[Exception], bool],
     sleep: Callable[[float], None] = time.sleep,
     on_attempt: Callable[[int, Exception | None], None] | None = None,
-) -> "T":  # type: ignore[type-var]
+) -> T:
     """Chạy ``fn`` với circuit breaker + retry/backoff.
 
     ``is_retryable(exc)`` quyết định lỗi có đáng thử lại (lỗi mạng/5xx) hay không

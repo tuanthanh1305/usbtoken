@@ -17,6 +17,7 @@ from cryptography.hazmat.primitives import hashes
 from cryptography.x509.oid import NameOID
 
 from core.models import CAInfo, TrustPathNode
+
 from .anchors import TrustAnchorStore
 
 # Số mắt xích tối đa để chặn vòng lặp/chuỗi bất thường.

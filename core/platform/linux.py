@@ -204,7 +204,7 @@ class LinuxAdapter(PlatformAdapter):
         lib_machine = "arm64" if lib in (BinaryArch.ARM64, BinaryArch.ARM_32) else "x86_64"
         return lib_machine != host["machine"]
 
-    def spawn_bridge_helper(self, lib_path: Path) -> "BridgeClient":
+    def spawn_bridge_helper(self, lib_path: Path) -> BridgeClient:
         from core.bridge.client import BridgeClient
         from core.errors import BridgeUnavailableError
 

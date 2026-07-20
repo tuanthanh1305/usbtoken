@@ -13,7 +13,7 @@
 #define SvcExe "vn-esign-service.exe"
 
 [Setup]
-AppId={{7E5B4C10-VNES-4A21-9F00-ESIGNSUITE01}}
+AppId={{7E5B4C10-9A21-4A21-9F00-A1B2C3D4E5F6}}
 AppName={#AppName}
 AppVersion={#AppVersion}
 AppPublisher={#AppPublisher}

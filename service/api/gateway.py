@@ -22,20 +22,20 @@ from pydantic import BaseModel, Field
 
 from core import __version__
 from core.aggregator import ca_info_from_validation, classify_token_source
-from core.engine import get_platform_info
 from core.discovery import diagnose_no_modules, discover_modules
+from core.engine import get_platform_info
+from core.errors import (
+    MechanismUnavailableError,
+    SignerError,
+    SigningFormatUnavailableError,
+    SigningNotAllowedError,
+)
 from core.models import (
     CertInfo,
     CertRecord,
     TokenInfo,
     ValidationResult,
     ValidationStatusCode,
-)
-from core.errors import (
-    MechanismUnavailableError,
-    SignerError,
-    SigningFormatUnavailableError,
-    SigningNotAllowedError,
 )
 from core.signature_verify import verify_detached
 from service.runtime import LOGGER_NAME
@@ -56,7 +56,7 @@ def _now() -> datetime:
 def token_public_id(token: TokenInfo) -> str:
     import hashlib
 
-    raw = f"{token.module_path}|{token.slot_id}|{token.serial}".encode("utf-8")
+    raw = f"{token.module_path}|{token.slot_id}|{token.serial}".encode()
     return hashlib.sha256(raw).hexdigest()[:16]
 
 
@@ -222,7 +222,7 @@ def token_certs(token_id: str, request: Request, session_id: str | None = None) 
 # --------------------------------------------------------------------------- #
 class LoginBody(BaseModel):
     token_id: str
-    pin: str = Field(..., description="PIN token (nhạy cảm — không log, không lưu).")
+    pin: str = Field(..., max_length=256, description="PIN token (nhạy cảm — không log, không lưu).")
 
 
 @router.post("/login", summary="Đăng nhập token bằng PIN -> phiên RAM có TTL")
@@ -245,7 +245,7 @@ def login(body: LoginBody, request: Request) -> dict[str, object]:
     except Exception as exc:  # noqa: BLE001
         _zeroize(pin_ba)
         _log.info("login token=%s: lỗi đọc", body.token_id)
-        raise HTTPException(status_code=500, detail=f"Lỗi khi đăng nhập token: {exc}")
+        raise HTTPException(status_code=500, detail=f"Lỗi khi đăng nhập token: {exc}") from exc
 
     err = getattr(result, "error", None)
     if err is not None:
@@ -309,7 +309,7 @@ def validate(body: ValidateBody, request: Request) -> dict[str, object]:
     try:
         der = base64.b64decode(body.certificate_b64)
     except (ValueError, TypeError):
-        raise HTTPException(status_code=400, detail="certificate_b64 không phải base64 hợp lệ.")
+        raise HTTPException(status_code=400, detail="certificate_b64 không phải base64 hợp lệ.") from None
 
     result: ValidationResult = deps.validator_factory().validate(der, body.at_time)
     _log.info("validate cert sha256=%s -> %s", result_subject_thumb(der), result.status.value)
@@ -320,7 +320,7 @@ def validate(body: ValidateBody, request: Request) -> dict[str, object]:
             data = base64.b64decode(body.signature.data_b64)
             sig = base64.b64decode(body.signature.signature_b64)
         except (ValueError, TypeError):
-            raise HTTPException(status_code=400, detail="data_b64/signature_b64 không hợp lệ.")
+            raise HTTPException(status_code=400, detail="data_b64/signature_b64 không hợp lệ.") from None
         ok, reason = verify_detached(
             der, data, sig,
             algorithm=body.signature.algorithm, rsa_scheme=body.signature.rsa_scheme,
@@ -343,7 +343,9 @@ class SignBody(BaseModel):
     token_id: str
     key_id: str = Field(..., description="CKA_ID (hex) của khoá private cần ký.")
     format: str = Field(default="cms", description="cms | pades | xades.")
-    payload_base64: str = Field(..., description="Thông điệp cần ký (base64).")
+    payload_base64: str = Field(
+        ..., max_length=96_000_000, description="Thông điệp cần ký (base64; trần ~72MB nhị phân)."
+    )
     session_id: str = Field(..., description="Phiên đăng nhập hợp lệ (bắt buộc để ký).")
     tsa_url: str | None = Field(default=None, description="URL TSA (tuỳ chọn/bắt buộc theo luật).")
 
@@ -375,7 +377,7 @@ def sign(body: SignBody, request: Request) -> dict[str, object]:
     try:
         payload = base64.b64decode(body.payload_base64)
     except (ValueError, TypeError):
-        raise HTTPException(status_code=400, detail="payload_base64 không phải base64 hợp lệ.")
+        raise HTTPException(status_code=400, detail="payload_base64 không phải base64 hợp lệ.") from None
 
     # 2) Lấy chứng thư người ký từ token (đăng nhập bằng PIN của phiên).
     read_result = deps.read_fn(token, session.pin_bytes)
@@ -402,11 +404,11 @@ def sign(body: SignBody, request: Request) -> dict[str, object]:
             "message_vi": exc.message,
             "reason": "Chứng thư KHÔNG hợp lệ — TỪ CHỐI KÝ (Điều 5 TT 15/2025).",
             "validation_result": vr,
-        })
+        }) from exc
     except (MechanismUnavailableError, SigningFormatUnavailableError) as exc:
-        raise HTTPException(status_code=409, detail={"message_vi": exc.message, "detail": exc.detail})
+        raise HTTPException(status_code=409, detail={"message_vi": exc.message, "detail": exc.detail}) from exc
     except SignerError as exc:
-        raise HTTPException(status_code=400, detail={"message_vi": exc.message, "detail": exc.detail})
+        raise HTTPException(status_code=400, detail={"message_vi": exc.message, "detail": exc.detail}) from exc
 
     _log.info(
         "sign OK token=%s fmt=%s mech=%s evidence=%s",

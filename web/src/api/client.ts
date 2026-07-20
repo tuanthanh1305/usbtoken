@@ -46,7 +46,15 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     );
   }
   const text = await res.text();
-  const body = text ? JSON.parse(text) : null;
+  let body: unknown = null;
+  try {
+    body = text ? JSON.parse(text) : null;
+  } catch {
+    // Thân phản hồi không phải JSON (vd. trang lỗi 502 của proxy) — vẫn báo lỗi
+    // tiếng Việt thân thiện thay vì ném SyntaxError tiếng Anh.
+    if (!res.ok) throw new ApiError(messageFromDetail(null, res.status), res.status, text);
+    throw new ApiError("Phản hồi từ daemon không hợp lệ (không phải JSON).", res.status, text);
+  }
   if (!res.ok) {
     const detail = body && typeof body === "object" ? (body as Record<string, unknown>).detail ?? body : body;
     throw new ApiError(messageFromDetail(detail, res.status), res.status, detail);

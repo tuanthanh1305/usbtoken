@@ -114,7 +114,7 @@ class BridgeManager:
             self._closed = True
             self._drop_client()
 
-    def __enter__(self) -> "BridgeManager":
+    def __enter__(self) -> BridgeManager:
         return self
 
     def __exit__(self, *exc: object) -> None:

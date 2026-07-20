@@ -183,7 +183,7 @@ class BridgeClient:
         if self._proc.poll() is None:
             self._proc.kill()
 
-    def __enter__(self) -> "BridgeClient":
+    def __enter__(self) -> BridgeClient:
         return self
 
     def __exit__(self, *exc: object) -> None:

@@ -15,7 +15,7 @@ from __future__ import annotations
 import secrets
 import threading
 import time
-from typing import Callable
+from collections.abc import Callable
 
 DEFAULT_TTL_SECONDS = 120.0
 
@@ -69,12 +69,17 @@ class SessionStore:
         return self._ttl
 
     def login(self, token_id: str, pin: bytes | bytearray | str) -> PinSession:
-        """Tạo phiên mới cho ``token_id`` (PIN chuyển sang bytearray, giữ trong RAM)."""
+        """Tạo phiên mới cho ``token_id`` (PIN chuyển sang bytearray, giữ trong RAM).
+
+        Store giữ BẢN SAO riêng của PIN: ``bytearray(...)`` bọc ngoài buộc copy kể
+        cả khi caller truyền vào chính một ``bytearray`` (nếu không, caller zeroize
+        bản của họ sẽ vô tình xoá luôn PIN trong phiên).
+        """
         now = self._clock()
         session = PinSession(
             session_id=secrets.token_urlsafe(24),
             token_id=token_id,
-            pin=_to_bytearray(pin),
+            pin=bytearray(_to_bytearray(pin)),  # copy phòng vệ — KHÔNG chia sẻ bộ nhớ với caller
             created_at=now,
             expires_at=now + self._ttl,
         )

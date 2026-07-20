@@ -28,13 +28,13 @@ import io
 import json
 import os
 import secrets
-import stat
 import threading
 import zipfile
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 from core.errors import EvidenceError
 from core.models import ValidationResult
@@ -170,9 +170,16 @@ class AppendOnlyLedger:
             if _record_hash(rec.get("prev_hash", ""), body) != stored:
                 issues.append(f"Bản ghi #{i}: record_hash không khớp — NỘI DUNG BỊ SỬA.")
             prev = stored
-        # Head anchor: phát hiện cắt đuôi.
+        # Head anchor: phát hiện cắt đuôi. THIẾU head khi đã có bản ghi cũng là
+        # dấu hiệu bất thường (kẻ tấn công cắt đuôi ledger rồi xoá luôn head để né).
         head = self._read_head()
-        if head is not None:
+        if head is None:
+            if records:
+                issues.append(
+                    "THIẾU head anchor trong khi ledger có bản ghi — không thể loại trừ "
+                    "việc CẮT ĐUÔI nhật ký."
+                )
+        else:
             if head.get("count") != len(records):
                 issues.append(
                     f"Số bản ghi ({len(records)}) khác head anchor ({head.get('count')}) — "

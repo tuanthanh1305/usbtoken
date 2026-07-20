@@ -36,7 +36,7 @@ def _version_tuple(cver: Any) -> list[int] | None:
             return [int(cver.major), int(cver.minor)]
         except (TypeError, ValueError):
             return None
-    if isinstance(cver, (tuple, list)) and len(cver) >= 2:
+    if isinstance(cver, tuple | list) and len(cver) >= 2:
         try:
             return [int(cver[0]), int(cver[1])]
         except (TypeError, ValueError):

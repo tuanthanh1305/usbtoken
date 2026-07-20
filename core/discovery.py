@@ -56,9 +56,9 @@ class ProbeResult:
     error: str = ""
 
     @classmethod
-    def from_raw(cls, raw: dict[str, Any]) -> "ProbeResult":
+    def from_raw(cls, raw: dict[str, Any]) -> ProbeResult:
         cver = raw.get("cryptoki_version")
-        version = (int(cver[0]), int(cver[1])) if isinstance(cver, (list, tuple)) and len(cver) >= 2 else None
+        version = (int(cver[0]), int(cver[1])) if isinstance(cver, list | tuple) and len(cver) >= 2 else None
         return cls(
             ok=bool(raw.get("ok")),
             cryptoki_version=version,

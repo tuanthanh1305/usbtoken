@@ -3,8 +3,7 @@ is_stale, và anti-tamper bằng chữ ký Ed25519 (fail-closed)."""
 
 from __future__ import annotations
 
-import json
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from pathlib import Path
 
 import pytest
@@ -123,6 +122,39 @@ def test_tampered_store_not_verified(tmp_path: Path, monkeypatch: pytest.MonkeyP
     store = store_mod.load(store_dir, verify_signature=True)
     assert store.verified is False
     assert store.is_usable is False  # fail-closed
+
+
+def test_injected_unlisted_cert_breaks_verification(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # REGRESSION: kẻ tấn công THÊM một neo gốc giả KHÔNG có trong manifest. Chữ ký
+    # manifest vẫn hợp lệ, file cũ vẫn khớp sha256 — nhưng kho PHẢI bị coi là KHÔNG
+    # verify (nếu không, evil root sẽ trở thành neo tin cậy).
+    root = _make("VN Root CA", None, is_ca=True)
+    evil = _make("Evil Root CA", None, is_ca=True)
+    store_dir = _make_signed_store(tmp_path, monkeypatch, {"root/root.der": root.der})
+    (store_dir / "root" / "evil.der").write_bytes(evil.der)  # chèn file ngoài manifest
+    store = store_mod.load(store_dir, verify_signature=True)
+    assert store.verified is False and store.is_usable is False  # fail-closed
+    assert store.is_trust_anchor(evil.cert) is False or not store.verified
+
+
+def test_empty_manifest_file_list_not_verified(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Manifest có chữ ký hợp lệ nhưng danh sách file RỖNG -> không ràng buộc gì -> từ chối.
+    root = _make("VN Root CA", None, is_ca=True)
+    store_dir = _make_signed_store(tmp_path, monkeypatch, {"root/root.der": root.der})
+    priv, pub = signing.generate_keypair()
+    pub_path = tmp_path / "pub2.pem"
+    signing.save_public_key(pub, pub_path)
+    monkeypatch.setattr(store_mod, "trust_signing_pub_path", lambda: pub_path)
+    manifest = {"version": 1, "synced_at": datetime.now(timezone.utc).isoformat(), "files": []}
+    raw = signing.canonical_bytes(manifest)
+    (store_dir / "manifest.json").write_bytes(raw)
+    (store_dir / "manifest.sig").write_bytes(signing.sign(priv, raw))
+    store = store_mod.load(store_dir, verify_signature=True)
+    assert store.verified is False
 
 
 def test_unsigned_store_not_usable(tmp_path: Path) -> None:

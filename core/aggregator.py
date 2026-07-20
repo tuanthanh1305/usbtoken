@@ -28,15 +28,15 @@ from __future__ import annotations
 import base64
 import hashlib
 import sys
-from dataclasses import dataclass, field
-from typing import Any, Callable, Protocol
+from collections.abc import Callable
+from dataclasses import dataclass
+from typing import Any, Protocol
 
 from core.models import (
     AggregateResult,
     CAInfo,
     CertInfo,
     CertRecord,
-    KeyInfo,
     TokenBundle,
     TokenInfo,
     ValidationResult,
@@ -194,13 +194,13 @@ def merge_all_sources(
     # Giữ thứ tự token + khoá gộp ổn định.
     token_keys: list[str] = [_token_key(i, t) for i, t in enumerate(tokens)]
     bundles: dict[str, TokenBundle] = {
-        k: TokenBundle(token=t) for k, t in zip(token_keys, tokens)
+        k: TokenBundle(token=t) for k, t in zip(token_keys, tokens, strict=False)
     }
 
     raws: list[_Raw] = []
 
     # -- Nguồn token (PKCS11/BRIDGE/P11KIT/PACKAGE) --------------------- #
-    for key, token in zip(token_keys, tokens):
+    for key, token in zip(token_keys, tokens, strict=False):
         source = classify_token_source(token)
         try:
             res = read(token, pin_callback)

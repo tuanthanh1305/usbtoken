@@ -6,8 +6,8 @@ import hashlib
 from datetime import datetime, timezone
 from pathlib import Path
 
-from tools import sync_trust_store as sync
 from tests.certs import _make
+from tools import sync_trust_store as sync
 
 
 def _stage(tmp_path: Path, role: str, name: str, data: bytes) -> sync.StagedFile:

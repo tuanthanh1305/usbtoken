@@ -74,6 +74,18 @@ def test_session_pin_is_bytearray_not_str() -> None:
     assert isinstance(s._pin, bytearray)  # zeroize được (không phải str bất biến)
 
 
+def test_session_login_copies_pin_defensively() -> None:
+    # REGRESSION: caller zeroize BẢN CỦA HỌ sau khi login KHÔNG được xoá PIN trong
+    # phiên (nếu chia sẻ bộ nhớ, mọi lần ký sau sẽ gửi PIN toàn số 0 -> khoá token).
+    store = SessionStore()
+    caller_pin = bytearray(b"123456")
+    s = store.login("tok", caller_pin)
+    for i in range(len(caller_pin)):  # caller tự zeroize
+        caller_pin[i] = 0
+    assert s.pin_bytes() == b"123456"  # phiên vẫn giữ PIN gốc
+    assert store.get(s.id).pin_bytes() == b"123456"
+
+
 # --------------------------------------------------------------------------- #
 # Bảo mật — host parsing, Host/Origin, rate limit                              #
 # --------------------------------------------------------------------------- #
